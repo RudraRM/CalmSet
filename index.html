@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CalmSet — Romanticize Your Focus</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Tailwind for utilities -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { corePlugins: { preflight: false } }
+  </script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN APP GRID
+═══════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── TOP LEFT: LOGO + STREAK ──────────────────── -->
+  <div id="top-left">
+    <a href="#" class="logo">Calm<span>Set</span></a>
+    <div class="streak-badge" id="streak-badge" title="Your daily streak">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2c0 0-6.5 5.5-6.5 10 0 3.59 2.91 6.5 6.5 6.5S20 15.59 20 12c0-4.5-6.5-10-6.5-10zm0 14.75c-2.62 0-4.75-2.13-4.75-4.75 0-1.94 1.08-3.75 2.5-5.22V12c0 .69.56 1.25 1.25 1.25s1.25-.56 1.25-1.25V6.78c1.42 1.47 2.5 3.28 2.5 5.22 0 2.62-2.13 4.75-4.75 4.75z"/></svg>
+      <span id="streak-count">0</span> day streak
+    </div>
+  </div>
+
+  <!-- ── TOP RIGHT: STATS + THEMES ────────────────── -->
+  <div id="top-right">
+    <div id="top-right-wrap" style="position:relative">
+      <button class="icon-btn" id="stats-btn" aria-label="View stats" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Stats
+      </button>
+      <!-- Stats Panel -->
+      <div class="glass" id="stats-panel" role="dialog" aria-label="Focus statistics">
+        <div class="panel-header">
+          <span class="panel-title">Your Focus</span>
+          <span style="font-size:10px;color:var(--text-muted)">last 7 days</span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-val" id="stat-focus">0</div>
+            <div class="stat-lbl">Focus min</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="stat-streak">0</div>
+            <div class="stat-lbl">Day streak</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="stat-tasks">0</div>
+            <div class="stat-lbl">Tasks done</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;letter-spacing:0.08em;text-transform:uppercase;">Weekly activity</div>
+        <div class="mini-chart" id="mini-chart" aria-label="Weekly focus activity chart">
+          <!-- bars injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div style="position:relative">
+      <button class="icon-btn" id="themes-btn" aria-label="Change theme" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20C6.48 22 2 17.52 2 12S6.48 2 12 2z"/><path d="M12 2v10l4.24 4.24"/></svg>
+        Themes
+      </button>
+      <!-- Theme dropdown -->
+      <div class="glass" id="theme-dropdown" role="listbox" aria-label="Select theme">
+        <button class="theme-option active" data-theme="" role="option" aria-selected="true">
+          <span class="theme-swatch" style="background: linear-gradient(135deg,#1a1040,#161b2e)"></span>
+          Cozy Night
+        </button>
+        <button class="theme-option" data-theme="theme-sunset" role="option" aria-selected="false">
+          <span class="theme-swatch" style="background: linear-gradient(135deg,#3d1f0d,#2a1020)"></span>
+          Sunset Gradient
+        </button>
+        <button class="theme-option" data-theme="theme-forest" role="option" aria-selected="false">
+          <span class="theme-swatch" style="background: linear-gradient(135deg,#0e2218,#091a12)"></span>
+          Forest Rain
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CENTER: CLOCK + QUOTE + TIMER ────────────── -->
+  <div id="center">
+
+    <!-- Live Clock -->
+    <div id="clock-display" aria-live="polite" aria-label="Current time">12:00 AM</div>
+
+    <!-- Greeting & Quote -->
+    <div id="greeting-block">
+      <p id="greeting-text">Welcome back, <span id="username-display">Friend</span>. Time to romanticize your growth.</p>
+      <p id="quote-text" aria-live="polite">"The secret of getting ahead is getting started."</p>
+    </div>
+
+    <!-- ── TIMER WIDGET ──────────────────────────── -->
+    <div class="glass" id="timer-widget" role="region" aria-label="Focus timer">
+
+      <!-- Mode Tabs -->
+      <div id="timer-modes" role="tablist" aria-label="Timer modes">
+        <button class="mode-tab active" data-mode="pomodoro" role="tab" aria-selected="true" aria-controls="timer-face">Pomodoro</button>
+        <button class="mode-tab" data-mode="countdown" role="tab" aria-selected="false" aria-controls="timer-face">Countdown</button>
+        <button class="mode-tab" data-mode="stopwatch" role="tab" aria-selected="false" aria-controls="timer-face">Stopwatch</button>
+        <button class="mode-tab" data-mode="animedoro" role="tab" aria-selected="false" aria-controls="timer-face">Animedoro</button>
+      </div>
+
+      <!-- Countdown input (hidden by default) -->
+      <div id="countdown-input-row" style="display:none;margin-bottom:14px;">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+          <input type="number" id="custom-mins" min="1" max="999" value="45"
+            style="width:68px;text-align:center;padding:7px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,0.2);color:var(--text-primary);font-family:'Space Grotesk',sans-serif;font-size:18px;outline:none;"
+            aria-label="Minutes" />
+          <span style="color:var(--text-muted);font-size:13px;">min</span>
+          <input type="number" id="custom-secs" min="0" max="59" value="0"
+            style="width:68px;text-align:center;padding:7px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,0.2);color:var(--text-primary);font-family:'Space Grotesk',sans-serif;font-size:18px;outline:none;"
+            aria-label="Seconds" />
+          <span style="color:var(--text-muted);font-size:13px;">sec</span>
+        </div>
+      </div>
+
+      <!-- Timer Face -->
+      <div id="timer-face">
+        <div id="timer-display" aria-live="polite" aria-label="Timer">25:00</div>
+        <div id="timer-label">Focus session</div>
+      </div>
+
+      <!-- Progress -->
+      <div id="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Session progress">
+        <div id="progress-fill"></div>
+      </div>
+
+      <!-- Controls -->
+      <div id="timer-controls">
+        <button class="timer-ctrl" id="reset-btn" aria-label="Reset timer" title="Reset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+
+        <button class="timer-ctrl" id="play-btn" aria-label="Play timer" title="Play / Pause">
+          <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+          <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+
+        <button class="timer-ctrl" id="pip-btn" aria-label="Picture-in-picture" title="Pop out timer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="11" width="8" height="6" rx="1"/></svg>
+        </button>
+      </div>
+
+    </div>
+    <!-- /timer-widget -->
+  </div>
+  <!-- /center -->
+
+  <!-- ── BOTTOM LEFT: TASKS ─────────────────────── -->
+  <div id="bottom-left">
+    <!-- Tasks Panel -->
+    <div class="glass" id="tasks-panel" role="dialog" aria-label="Task manager" aria-hidden="true">
+      <div class="panel-header">
+        <span class="panel-title">Today's Tasks</span>
+        <span id="task-progress-text">0 / 0</span>
+      </div>
+      <div id="task-progress-bar"><div id="task-progress-fill" style="width:0%"></div></div>
+
+      <!-- Add task -->
+      <div id="task-add-row">
+        <input type="text" id="task-input" placeholder="Add a task…" maxlength="120" aria-label="New task text" />
+        <button id="add-task-btn" aria-label="Add task">+ Add</button>
+      </div>
+      <div class="task-meta-row">
+        <input type="text" id="task-emoji" placeholder="🌿 emoji" maxlength="4"
+          style="max-width:80px;" aria-label="Task emoji" />
+        <select id="task-priority" aria-label="Task priority">
+          <option value="low">Low</option>
+          <option value="med" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+
+      <div id="task-list" role="list" aria-label="Task list">
+        <!-- tasks injected by JS -->
+      </div>
+    </div>
+
+    <button class="icon-btn" id="task-trigger" aria-label="Open task list" aria-expanded="false" aria-controls="tasks-panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </button>
+  </div>
+
+  <!-- ── BOTTOM CENTER: AUDIO ───────────────────── -->
+  <div id="bottom-center" style="position:relative">
+    <!-- Audio Panel -->
+    <div class="glass" id="audio-panel" role="dialog" aria-label="Ambient audio mixer" aria-hidden="true">
+      <div class="panel-header">
+        <span class="panel-title">Soundscapes</span>
+        <span style="font-size:10px;color:var(--text-muted)">blend freely</span>
+      </div>
+
+      <!-- Sound rows -->
+      <div class="audio-row">
+        <button class="sound-toggle" data-sound="rain" aria-label="Toggle rain sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><path d="M16 14v6M8 14v6M12 16v6"/></svg>
+        </button>
+        <span class="sound-name">Rain</span>
+        <input type="range" class="sound-vol" min="0" max="100" value="60" data-sound="rain" aria-label="Rain volume" />
+        <span class="vol-pct">60%</span>
+      </div>
+
+      <div class="audio-row">
+        <button class="sound-toggle" data-sound="fire" aria-label="Toggle fireplace sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12c0-3 2-5 2-8a5 5 0 0 0-9 2c0 2 1 3 1 5"/><path d="M14.5 17.5A4.5 4.5 0 0 1 7 17c0-3 2.5-5 2.5-5"/><path d="M10 22a7 7 0 0 1 7-7 2.5 2.5 0 0 0-2.5-2.5"/></svg>
+        </button>
+        <span class="sound-name">Fireplace</span>
+        <input type="range" class="sound-vol" min="0" max="100" value="50" data-sound="fire" aria-label="Fireplace volume" />
+        <span class="vol-pct">50%</span>
+      </div>
+
+      <div class="audio-row">
+        <button class="sound-toggle" data-sound="cafe" aria-label="Toggle coffee shop sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>
+        </button>
+        <span class="sound-name">Coffee Shop</span>
+        <input type="range" class="sound-vol" min="0" max="100" value="45" data-sound="cafe" aria-label="Coffee shop volume" />
+        <span class="vol-pct">45%</span>
+      </div>
+
+      <div class="audio-row">
+        <button class="sound-toggle" data-sound="noise" aria-label="Toggle brown noise" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9 2 0"/></svg>
+        </button>
+        <span class="sound-name">Brown Noise</span>
+        <input type="range" class="sound-vol" min="0" max="100" value="40" data-sound="noise" aria-label="Brown noise volume" />
+        <span class="vol-pct">40%</span>
+      </div>
+
+      <!-- Stream URL -->
+      <div id="spotify-row">
+        <input type="url" id="stream-url" placeholder="Paste Spotify / YouTube URL…" aria-label="Stream URL" />
+        <button id="stream-go" aria-label="Open stream URL">Open ↗</button>
+      </div>
+    </div>
+
+    <button class="icon-btn" id="audio-trigger" aria-label="Open soundscapes" aria-expanded="false" aria-controls="audio-panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      Soundscapes
+    </button>
+  </div>
+
+  <!-- ── BOTTOM RIGHT: FOCUS MODE + SETTINGS ───── -->
+  <div id="bottom-right">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <button class="icon-btn" id="focus-mode-btn" aria-label="Toggle focus mode" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Focus
+      </button>
+      <span id="focus-mode-lbl">ambient</span>
+    </div>
+
+    <button class="icon-btn" id="settings-btn" aria-label="Open settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </div>
+
+</div>
+<!-- /app -->
+
+<!-- ═══════════════════════════════════════════════
+     SETTINGS MODAL
+═══════════════════════════════════════════════ -->
+<div id="settings-overlay" role="dialog" aria-modal="true" aria-label="CalmSet Settings" aria-hidden="true">
+  <div id="settings-modal">
+
+    <!-- Left nav -->
+    <nav id="settings-nav" aria-label="Settings sections">
+      <div class="settings-nav-title">Settings</div>
+      <button class="nav-item active" data-section="general">General</button>
+      <button class="nav-item" data-section="timer">Focus Timer</button>
+      <button class="nav-item" data-section="audio">Audio & Sound</button>
+      <button class="nav-item" data-section="profile">Profile & Plan</button>
+    </nav>
+
+    <!-- Right content -->
+    <div id="settings-content">
+      <button id="settings-close" aria-label="Close settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <!-- GENERAL -->
+      <div class="settings-section active" id="section-general">
+        <h2 class="settings-section-title">General</h2>
+        <p class="settings-section-sub">Customize your CalmSet experience</p>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            Your name
+            <small>Appears in the greeting message</small>
+          </div>
+          <input type="text" class="settings-input" id="s-username" placeholder="e.g. Alex" maxlength="30" />
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            Clock format
+            <small>12-hour or 24-hour display</small>
+          </div>
+          <select class="settings-select" id="s-clock-format" aria-label="Clock format">
+            <option value="12">12-hour (AM/PM)</option>
+            <option value="24">24-hour</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-label">
+            Clear Mode
+            <small>Hides UI — only timer remains</small>
+          </div>
+          <label class="toggle" aria-label="Toggle clear mode">
+            <input type="checkbox" id="s-clear-mode" />
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+
+        <button class="save-btn" id="save-general">Save changes</button>
+      </div>
+
+      <!-- TIMER -->
+      <div class="settings-section" id="section-timer">
+        <h2 class="settings-section-title">Focus Timer</h2>
+        <p class="settings-section-sub">Configure your session intervals</p>
+
+        <div class="settings-row">
+          <div class="settings-label">Focus duration<small>minutes</small></div>
+          <input type="number" class="settings-input sm" id="s-focus" min="1" max="120" value="25" aria-label="Focus duration in minutes" />
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Short break<small>minutes</small></div>
+          <input type="number" class="settings-input sm" id="s-short" min="1" max="60" value="5" aria-label="Short break duration" />
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Long break<small>minutes</small></div>
+          <input type="number" class="settings-input sm" id="s-long" min="1" max="120" value="15" aria-label="Long break duration" />
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Alert sound</div>
+          <select class="settings-select" id="s-alert-sound" aria-label="Alert sound">
+            <option value="digital_bell">Digital Bell</option>
+            <option value="bird_chirp">Bird Chirp</option>
+            <option value="lofi_chime">Lofi Chime</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Alert volume<small><span id="alert-vol-val">70</span>%</small></div>
+          <input type="range" class="settings-range" id="s-alert-vol" min="0" max="100" value="70" aria-label="Alert volume" />
+        </div>
+
+        <button class="save-btn" id="save-timer">Save changes</button>
+      </div>
+
+      <!-- AUDIO -->
+      <div class="settings-section" id="section-audio">
+        <h2 class="settings-section-title">Audio & Sound</h2>
+        <p class="settings-section-sub">Master control for all sounds</p>
+
+        <div class="settings-row">
+          <div class="settings-label">Master volume<small><span id="master-vol-val">80</span>%</small></div>
+          <input type="range" class="settings-range" id="s-master-vol" min="0" max="100" value="80" aria-label="Master volume" />
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">
+            Auto-pause ambient on break
+            <small>Pauses sound loops during break intervals</small>
+          </div>
+          <label class="toggle" aria-label="Auto-pause ambient toggle">
+            <input type="checkbox" id="s-auto-pause" checked />
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+
+        <button class="save-btn" id="save-audio">Save changes</button>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="settings-section" id="section-profile">
+        <h2 class="settings-section-title">Profile & Plan</h2>
+        <p class="settings-section-sub">Your account details</p>
+
+        <div class="settings-row">
+          <div class="settings-label">Current plan</div>
+          <span style="font-size:12px;color:var(--text-accent);font-weight:500;">CalmSet Free</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Total focus time</div>
+          <span style="font-size:12px;color:var(--text-secondary);" id="profile-focus-time">0 min</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Tasks completed</div>
+          <span style="font-size:12px;color:var(--text-secondary);" id="profile-tasks">0</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Daily streak</div>
+          <span style="font-size:12px;color:var(--text-secondary);" id="profile-streak">0 days</span>
+        </div>
+
+        <div style="margin-top:24px;padding:16px;border-radius:var(--radius-md);border:1px solid var(--glass-border);background:var(--accent-soft);">
+          <p style="font-size:12px;color:var(--text-accent);font-weight:500;margin-bottom:4px;">✦ CalmSet Pro — Coming Soon</p>
+          <p style="font-size:11px;color:var(--text-muted);line-height:1.6;">Unlock custom themes, AI-powered session insights, advanced stats, and more.</p>
+        </div>
+      </div>
+
+    </div>
+    <!-- /settings-content -->
+  </div>
+  <!-- /settings-modal -->
+</div>
+<!-- /settings-overlay -->
+
+<!-- PiP video element (hidden) -->
+<video id="pip-video" style="display:none" autoplay muted loop></video>
+
+<!-- Toast notification -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Hidden audio elements -->
+<audio id="audio-rain" loop></audio>
+<audio id="audio-fire" loop></audio>
+<audio id="audio-cafe" loop></audio>
+<audio id="audio-noise" loop></audio>
+
+<script src="app.js"></script>
+</body>
+</html>
