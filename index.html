@@ -234,29 +234,6 @@
         <input type="range" class="sound-vol" min="0" max="100" value="40" data-sound="noise" aria-label="Brown noise volume" />
         <span class="vol-pct">40%</span>
       </div>
-
-      <!-- Spotify Connect -->
-      <div id="spotify-connect-row" style="display:flex;gap:8px;align-items:center;margin:12px 0;padding:12px;border-radius:8px;background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.2);">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="rgba(29,185,84,0.9)"/><path d="M9.5 11c-.4 0-.8.2-1 .5-.5.8-.3 1.9.5 2.4.3.2.7.2 1 .2.4 0 .8-.2 1-.5.5-.8.3-1.9-.5-2.4-.2-.1-.5-.2-.8-.2zm5 0c-.3 0-.6.1-.8.2-.8.5-1 1.6-.5 2.4.2.3.6.5 1 .5.3 0 .7 0 1-.2.8-.5 1-1.6.5-2.4-.2-.3-.6-.5-1-.5zm-2.5 3c-.4 0-.8.3-.8.8 0 .4.3.8.8.8s.8-.3.8-.8c0-.4-.3-.8-.8-.8z" fill="white" opacity="0.8"/></svg>
-        <span style="flex:1;font-size:12px;color:var(--text-secondary);">Connect Spotify to see your current track</span>
-        <button id="spotify-connect-btn" aria-label="Connect to Spotify" style="padding:6px 12px;border-radius:6px;background:rgba(29,185,84,0.9);color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;">Connect</button>
-      </div>
-
-      <!-- Spotify Connected Display -->
-      <div id="spotify-connected" style="display:none;margin:12px 0;padding:12px;border-radius:8px;background:rgba(29,185,84,0.05);border:1px solid rgba(29,185,84,0.2);">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">🎵 Spotify Connected</div>
-        <img id="spotify-album-art" src="" alt="Album art" style="width:100%;height:auto;border-radius:6px;margin-bottom:8px;max-height:150px;object-fit:cover;" />
-        <div id="spotify-track-info" style="font-size:12px;color:var(--text-primary);">
-          <div id="spotify-track-name" style="font-weight:600;margin-bottom:2px;">—</div>
-          <div id="spotify-artist-name" style="color:var(--text-secondary);font-size:11px;">—</div>
-        </div>
-      </div>
-
-      <!-- Stream URL -->
-      <div id="spotify-row">
-        <input type="url" id="stream-url" placeholder="Paste YouTube URL…" aria-label="YouTube URL" />
-        <button id="stream-go" aria-label="Open stream URL">Open ↗</button>
-      </div>
     </div>
 
     <button class="icon-btn" id="audio-trigger" aria-label="Open soundscapes" aria-expanded="false" aria-controls="audio-panel">
@@ -297,6 +274,7 @@
       <button class="nav-item" data-section="timer">Focus Timer</button>
       <button class="nav-item" data-section="audio">Audio & Sound</button>
       <button class="nav-item" data-section="profile">Profile & Plan</button>
+      <button class="nav-item" data-section="wallpaper">Wallpaper</button>
     </nav>
 
     <!-- Right content -->
@@ -427,6 +405,33 @@
           <p style="font-size:12px;color:var(--text-accent);font-weight:500;margin-bottom:4px;">✦ CalmSet Pro — Coming Soon</p>
           <p style="font-size:11px;color:var(--text-muted);line-height:1.6;">Unlock custom themes, AI-powered session insights, advanced stats, and more.</p>
         </div>
+      </div>
+
+      <!-- WALLPAPER -->
+      <div class="settings-section" id="section-wallpaper">
+        <h2 class="settings-section-title">Wallpaper</h2>
+        <p class="settings-section-sub">Upload a custom background for your dashboard</p>
+
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+          <div class="settings-label" style="margin-bottom:12px;">
+            Upload wallpaper
+            <small>PNG, JPEG, or PDF (images only)</small>
+          </div>
+          <input type="file" id="wallpaper-upload" accept=".png,.jpg,.jpeg,.pdf"
+            style="padding:8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,0.2);color:var(--text-primary);font-family:'Space Grotesk',sans-serif;width:100%;cursor:pointer;"
+            aria-label="Upload wallpaper image" />
+          <small style="color:var(--text-muted);margin-top:8px;">Max 5MB. The image will be displayed behind your dashboard.</small>
+        </div>
+
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;margin-top:12px;">
+          <div class="settings-label" style="margin-bottom:12px;">Current wallpaper</div>
+          <div id="wallpaper-preview" style="width:100%;height:150px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;">
+            No custom wallpaper set
+          </div>
+          <button id="remove-wallpaper-btn" class="save-btn" style="margin-top:12px;background:rgba(255,0,0,0.1);color:var(--text-secondary);display:none;">Remove Wallpaper</button>
+        </div>
+
+        <button class="save-btn" id="save-wallpaper" style="margin-top:16px;">Save Wallpaper</button>
       </div>
 
     </div>
