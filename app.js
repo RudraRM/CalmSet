@@ -419,30 +419,40 @@ const activeSources = {};
 
 function createNoiseBuffer(type = 'brown') {
   const ctx = getAudioContext();
-  const bufferSize = ctx.sampleRate * 3; // 3 seconds
+  const bufferSize = ctx.sampleRate * 3;
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
 
   if (type === 'brown') {
+    // Improved brown noise with better spectral characteristics
     let last = 0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
-      data[i] = (last + (0.02 * white)) / 1.02;
+      data[i] = (last + (0.025 * white)) / 1.025;
       last = data[i];
-      data[i] *= 3.5;
+      data[i] *= 3.2;
+    }
+  } else if (type === 'pink') {
+    // Pink noise for more natural sounds
+    let last = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      data[i] = (last + (0.015 * white)) / 1.015;
+      last = data[i];
+      data[i] *= 2.5;
     }
   } else if (type === 'white') {
     for (let i = 0; i < bufferSize; i++) {
       data[i] = Math.random() * 2 - 1;
     }
   } else if (type === 'rain') {
-    // Layered noise filtered to simulate rain
+    // Rain-specific noise with pink characteristics
     let last = 0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
-      data[i] = (last + (0.04 * white)) / 1.04;
+      data[i] = (last + (0.018 * white)) / 1.018;
       last = data[i];
-      data[i] *= 2.8;
+      data[i] *= 2.9;
     }
   }
 
@@ -465,62 +475,164 @@ function startSound(name) {
   gain.gain.value = vol;
 
   if (name === 'rain') {
-    // Pink-ish filtered noise for rain
-    const buffer = createNoiseBuffer('rain');
-    const playLoop = () => {
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 1200;
-      filter.Q.value = 0.5;
-      source.connect(filter);
-      filter.connect(gain);
-      source.start();
-      source.onended = () => { if (soundState.rain) playLoop(); };
-      activeSources[name] = source;
+    // Realistic rain with multiple filtered layers
+    const playRain = () => {
+      const buffer = createNoiseBuffer('rain');
+
+      // Layer 1: High-frequency rain patter (3000-6000Hz)
+      const source1 = ctx.createBufferSource();
+      source1.buffer = buffer;
+      const filter1 = ctx.createBiquadFilter();
+      filter1.type = 'highpass';
+      filter1.frequency.value = 3000;
+      const filter1b = ctx.createBiquadFilter();
+      filter1b.type = 'lowpass';
+      filter1b.frequency.value = 6000;
+      const gain1 = ctx.createGain();
+      gain1.gain.value = 0.6;
+      source1.connect(filter1);
+      filter1.connect(filter1b);
+      filter1b.connect(gain1);
+      gain1.connect(gain);
+
+      // Layer 2: Mid-frequency rain (1000-3000Hz)
+      const source2 = ctx.createBufferSource();
+      source2.buffer = buffer;
+      const filter2 = ctx.createBiquadFilter();
+      filter2.type = 'bandpass';
+      filter2.frequency.value = 2000;
+      filter2.Q.value = 0.7;
+      const gain2 = ctx.createGain();
+      gain2.gain.value = 0.4;
+      source2.connect(filter2);
+      filter2.connect(gain2);
+      gain2.connect(gain);
+
+      source1.start();
+      source2.start();
+      source1.onended = () => { if (soundState.rain) playRain(); };
+      activeSources[name] = source1;
     };
-    playLoop();
+    playRain();
   } else if (name === 'fire') {
-    // Crackle: low-freq brown noise with occasional spikes
+    // Realistic fireplace with crackling effects
     const playFire = () => {
       const buffer = createNoiseBuffer('brown');
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 800;
-      source.connect(filter);
-      filter.connect(gain);
-      source.start();
-      source.onended = () => { if (soundState.fire) playFire(); };
-      activeSources[name] = source;
+
+      // Main fire rumble
+      const source1 = ctx.createBufferSource();
+      source1.buffer = buffer;
+      const filter1 = ctx.createBiquadFilter();
+      filter1.type = 'lowpass';
+      filter1.frequency.value = 400;
+      filter1.Q.value = 0.8;
+      const gain1 = ctx.createGain();
+      gain1.gain.value = 0.5;
+      source1.connect(filter1);
+      filter1.connect(gain1);
+      gain1.connect(gain);
+
+      // Crackling mid-range
+      const source2 = ctx.createBufferSource();
+      source2.buffer = buffer;
+      const filter2 = ctx.createBiquadFilter();
+      filter2.type = 'bandpass';
+      filter2.frequency.value = 1200;
+      filter2.Q.value = 1.2;
+      const gain2 = ctx.createGain();
+      gain2.gain.value = 0.4;
+      source2.connect(filter2);
+      filter2.connect(gain2);
+      gain2.connect(gain);
+
+      // Add occasional pops/crackles with oscillators
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          if (soundState.fire) {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            const crackGain = ctx.createGain();
+            crackGain.gain.setValueAtTime(0.3, ctx.currentTime);
+            crackGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+            osc.frequency.setValueAtTime(Math.random() * 400 + 100, ctx.currentTime);
+            osc.connect(crackGain);
+            crackGain.connect(gain);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+          }
+        }, i * 800 + Math.random() * 400);
+      }
+
+      source1.start();
+      source2.start();
+      source1.onended = () => { if (soundState.fire) playFire(); };
+      activeSources[name] = source1;
     };
     playFire();
   } else if (name === 'cafe') {
-    // Multiple filtered white noise layers
+    // Coffee shop ambience with multiple layers
     const playCafe = () => {
       const buffer = createNoiseBuffer('white');
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 600;
-      filter.Q.value = 0.8;
-      source.connect(filter);
-      filter.connect(gain);
-      source.start();
-      source.onended = () => { if (soundState.cafe) playCafe(); };
-      activeSources[name] = source;
+
+      // Layer 1: Low rumble (voices beneath)
+      const source1 = ctx.createBufferSource();
+      source1.buffer = buffer;
+      const filter1 = ctx.createBiquadFilter();
+      filter1.type = 'lowpass';
+      filter1.frequency.value = 300;
+      const gain1 = ctx.createGain();
+      gain1.gain.value = 0.3;
+      source1.connect(filter1);
+      filter1.connect(gain1);
+      gain1.connect(gain);
+
+      // Layer 2: Voice range chatter (500-2000Hz)
+      const source2 = ctx.createBufferSource();
+      source2.buffer = buffer;
+      const filter2 = ctx.createBiquadFilter();
+      filter2.type = 'bandpass';
+      filter2.frequency.value = 1200;
+      filter2.Q.value = 0.9;
+      const gain2 = ctx.createGain();
+      gain2.gain.value = 0.5;
+      source2.connect(filter2);
+      filter2.connect(gain2);
+      gain2.connect(gain);
+
+      // Layer 3: High ambient (espresso machine, cups clinking)
+      const source3 = ctx.createBufferSource();
+      source3.buffer = buffer;
+      const filter3 = ctx.createBiquadFilter();
+      filter3.type = 'highpass';
+      filter3.frequency.value = 2000;
+      const gain3 = ctx.createGain();
+      gain3.gain.value = 0.2;
+      source3.connect(filter3);
+      filter3.connect(gain3);
+      gain3.connect(gain);
+
+      source1.start();
+      source2.start();
+      source3.start();
+      source1.onended = () => { if (soundState.cafe) playCafe(); };
+      activeSources[name] = source1;
     };
     playCafe();
   } else if (name === 'noise') {
-    // Brown noise
+    // Clean, smooth brown noise
     const playNoise = () => {
       const buffer = createNoiseBuffer('brown');
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(gain);
+
+      // Apply gentle smoothing filter
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 8000;
+      filter.Q.value = 0.5;
+
+      source.connect(filter);
+      filter.connect(gain);
       source.start();
       source.onended = () => { if (soundState.noise) playNoise(); };
       activeSources[name] = source;
