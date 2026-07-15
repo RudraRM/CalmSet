@@ -305,7 +305,7 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 $('pip-btn').addEventListener('click', async () => {
   try {
     if (!document.pictureInPictureElement) {
-      // Draw timer to canvas and stream to video
+      // Draw timer to canvas and stream to video (works in Chrome, Edge, Safari)
       const canvas = document.createElement('canvas');
       canvas.width = 320; canvas.height = 160;
       const ctx = canvas.getContext('2d');
@@ -334,16 +334,73 @@ $('pip-btn').addEventListener('click', async () => {
       video.srcObject = stream;
       video.style.display = 'block';
       await video.play();
-      await video.requestPictureInPicture();
+
+      // Cross-browser PiP support (Chrome, Edge, Safari 15.1+)
+      if (video.requestPictureInPicture) {
+        await video.requestPictureInPicture();
+      } else if (document.documentElement.requestFullscreen) {
+        // Fallback for browsers without PiP
+        toast('Picture-in-Picture not supported, use fullscreen instead');
+        return;
+      }
+
       video.style.display = 'none';
       toast('Timer in Picture-in-Picture');
     } else {
-      await document.exitPictureInPicture();
+      if (document.exitPictureInPicture) {
+        await document.exitPictureInPicture();
+      }
       toast('PiP closed');
     }
   } catch (e) {
-    toast('PiP not supported in this browser');
+    toast('Picture-in-Picture not supported in this browser');
   }
+});
+
+/* ── FULLSCREEN MODE ─────────────────────────── */
+$('fullscreen-btn').addEventListener('click', () => {
+  const appEl = $('app');
+
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
+    // Enter fullscreen (cross-browser support)
+    if (appEl.requestFullscreen) {
+      appEl.requestFullscreen().catch(err => {
+        toast(`Error entering fullscreen: ${err.message}`);
+      });
+    } else if (appEl.webkitRequestFullscreen) {
+      // Safari & older Chrome
+      appEl.webkitRequestFullscreen();
+    } else if (appEl.mozRequestFullScreen) {
+      // Firefox
+      appEl.mozRequestFullScreen();
+    } else {
+      toast('Fullscreen not supported');
+    }
+    $('fullscreen-btn').setAttribute('aria-pressed', 'true');
+    toast('Fullscreen mode on');
+  } else {
+    // Exit fullscreen (cross-browser support)
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    }
+    $('fullscreen-btn').setAttribute('aria-pressed', 'false');
+    toast('Fullscreen mode off');
+  }
+});
+
+// Listen for fullscreen changes to sync button state
+document.addEventListener('fullscreenchange', () => {
+  $('fullscreen-btn').setAttribute('aria-pressed', !!document.fullscreenElement);
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  $('fullscreen-btn').setAttribute('aria-pressed', !!document.webkitFullscreenElement);
+});
+document.addEventListener('mozfullscreenchange', () => {
+  $('fullscreen-btn').setAttribute('aria-pressed', !!document.mozFullScreenElement);
 });
 
 /* ── ALERT SOUND ─────────────────────────────── */
@@ -1204,6 +1261,39 @@ document.addEventListener('keydown', e => {
   else if (e.code === 'Digit3') setMode('stopwatch');
   else if (e.code === 'Digit4') setMode('animedoro');
 });
+
+/* ═══════════════════════════════════════════════
+   BROWSER DETECTION & MOBILE OPTIMIZATION
+═══════════════════════════════════════════════ */
+function detectBrowser() {
+  const ua = navigator.userAgent;
+  const browser = {
+    isChrome: /Chrome/.test(ua) && !/Edge/.test(ua),
+    isEdge: /Edg/.test(ua),
+    isSafari: /Safari/.test(ua) && !/Chrome/.test(ua) && !/Edg/.test(ua),
+    isFirefox: /Firefox/.test(ua),
+    isMobile: /iPhone|iPad|Android|webOS|BlackBerry|Windows Phone/.test(ua),
+    isIOS: /iPhone|iPad/.test(ua)
+  };
+  return browser;
+}
+
+const browserInfo = detectBrowser();
+
+// Mobile viewport optimization
+if (browserInfo.isMobile) {
+  document.body.style.touchAction = 'manipulation';
+  document.documentElement.style.overscrollBehavior = 'none';
+}
+
+// Safari fullscreen compatibility
+if (browserInfo.isSafari && browserInfo.isIOS) {
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      window.scrollTo(0, 0);
+    }
+  });
+}
 
 /* ═══════════════════════════════════════════════
    INIT

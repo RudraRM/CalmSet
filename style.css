@@ -1253,19 +1253,59 @@ body.focus-mode #timer-display { color: var(--timer-focus); }
   letter-spacing: 0.05em;
 }
 
-/* ── RESPONSIVE ────────────────────────────────── */
-@media (max-width: 768px) {
+/* ── RESPONSIVE & MOBILE FRIENDLY ─────────────── */
+@media (max-width: 1024px) {
   #app {
-    padding: 16px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto auto;
+    gap: 12px;
   }
 
-  #tasks-panel, #audio-panel {
+  #top-left, #top-right { grid-column: 1; }
+  #center { grid-column: 1; grid-row: 3; }
+  #bottom-left, #bottom-center, #bottom-right { grid-column: 1; display: flex; gap: 8px; }
+
+  #bottom-right {
+    justify-content: space-around;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  #app {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  #top-left {
+    order: 1;
+  }
+
+  #top-right {
+    order: 2;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #center {
+    order: 3;
+  }
+
+  #bottom-left, #bottom-center, #bottom-right {
+    order: auto;
+  }
+
+  #tasks-panel, #audio-panel, #stats-panel {
     width: calc(100vw - 32px);
+    max-width: 100%;
   }
 
   #audio-panel {
     left: auto;
-    right: 0;
+    right: 8px;
     transform: scaleY(0) translateY(4px);
     transform-origin: bottom right;
   }
@@ -1275,17 +1315,135 @@ body.focus-mode #timer-display { color: var(--timer-focus); }
   }
 
   #timer-display {
-    font-size: 52px;
+    font-size: 48px;
   }
 
-  #timer-widget { width: min(340px, 88vw); }
+  #timer-widget {
+    width: min(340px, 88vw);
+    padding: 16px 12px;
+  }
 
-  .mode-tab { font-size: 9px; padding: 6px 3px; }
+  .mode-tab {
+    font-size: 9px;
+    padding: 6px 4px;
+  }
 
-  #clock-display { font-size: 40px; }
+  #clock-display {
+    font-size: 36px;
+  }
 
-  #settings-modal { flex-direction: column; }
-  #settings-nav { width: 100%; flex-direction: row; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .icon-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #settings-modal {
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+  }
+
+  #settings-nav {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap;
+  }
+
+  #settings-content {
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .settings-section {
+    padding: 12px;
+  }
+
+  .settings-row {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .glass {
+    padding: 12px;
+  }
+
+  .panel-header {
+    padding: 8px 0;
+  }
+
+  #bottom-right {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  html, body {
+    font-size: 13px;
+  }
+
+  #app {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  #clock-display {
+    font-size: 28px;
+  }
+
+  #timer-display {
+    font-size: 40px;
+  }
+
+  #timer-widget {
+    padding: 12px 8px;
+  }
+
+  .icon-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .icon-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  #timer-controls {
+    gap: 4px;
+  }
+
+  .timer-ctrl {
+    width: 36px;
+    height: 36px;
+  }
+
+  #greeting-text {
+    font-size: 12px;
+  }
+
+  #quote-text {
+    font-size: 11px;
+  }
+
+  #bottom-left, #bottom-center, #bottom-right {
+    gap: 4px;
+  }
+
+  #stats-btn, #themes-btn {
+    padding: 6px 8px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
