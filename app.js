@@ -583,17 +583,6 @@ document.querySelectorAll('.sound-vol').forEach(slider => {
   });
 });
 
-// Stream URL
-$('stream-go').addEventListener('click', () => {
-  const url = $('stream-url').value.trim();
-  if (url) {
-    window.open(url, '_blank', 'noopener');
-    toast('Opening stream…');
-  } else {
-    toast('Paste a URL first');
-  }
-});
-
 // Audio panel toggle
 $('audio-trigger').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -606,45 +595,6 @@ $('audio-trigger').addEventListener('click', (e) => {
     $('tasks-panel').classList.remove('open');
     $('stats-panel').classList.remove('open');
     $('theme-dropdown').classList.remove('open');
-  }
-});
-
-/* ═══════════════════════════════════════════════
-   SPOTIFY INTEGRATION
-═══════════════════════════════════════════════ */
-let spotifyConnected = false;
-
-function showSpotifyConnected(trackData) {
-  $('spotify-connect-row').style.display = 'none';
-  $('spotify-connected').style.display = 'block';
-
-  if (trackData && trackData.image) {
-    $('spotify-album-art').src = trackData.image;
-    $('spotify-track-name').textContent = trackData.track || 'Unknown Track';
-    $('spotify-artist-name').textContent = trackData.artist || 'Unknown Artist';
-  }
-}
-
-function hideSpotifyConnected() {
-  $('spotify-connect-row').style.display = 'flex';
-  $('spotify-connected').style.display = 'none';
-  spotifyConnected = false;
-}
-
-$('spotify-connect-btn').addEventListener('click', () => {
-  if (spotifyConnected) {
-    hideSpotifyConnected();
-    toast('Spotify disconnected');
-  } else {
-    // Simulate Spotify connection
-    spotifyConnected = true;
-    const mockTrack = {
-      track: 'Lo-fi Study Beats',
-      artist: 'ChillHop Music',
-      image: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 300%22%3E%3Crect fill=%22%231DB954%22 width=%22300%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-size=%2248%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22%3ESpotify%3C/text%3E%3C/svg%3E'
-    };
-    showSpotifyConnected(mockTrack);
-    toast('Connected to Spotify ✓');
   }
 });
 
@@ -1030,6 +980,81 @@ $('save-timer').addEventListener('click', () => saveSettings('timer'));
 $('save-audio').addEventListener('click', () => saveSettings('audio'));
 
 /* ═══════════════════════════════════════════════
+   WALLPAPER SETTINGS
+═══════════════════════════════════════════════ */
+let wallpaperData = null;
+
+function loadWallpaperPreview() {
+  const stored = localStorage.getItem('calmset_wallpaper');
+  if (stored) {
+    wallpaperData = stored;
+    document.body.style.backgroundImage = `url('${stored}')`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    $('wallpaper-preview').innerHTML = '<img src="' + stored + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="Wallpaper preview" />';
+    $('remove-wallpaper-btn').style.display = 'block';
+  }
+}
+
+$('wallpaper-upload').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  const validTypes = ['image/png', 'image/jpeg', 'application/pdf'];
+
+  if (file.size > maxSize) {
+    toast('File too large. Max 5MB.');
+    return;
+  }
+
+  // For PDF, we'll just show a message that only image format is supported for display
+  if (file.type === 'application/pdf') {
+    toast('PDFs cannot be displayed as wallpapers. Please use PNG or JPEG.');
+    return;
+  }
+
+  if (!validTypes.includes(file.type)) {
+    toast('Invalid file type. Use PNG, JPEG, or PDF.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    wallpaperData = event.target.result;
+    $('wallpaper-preview').innerHTML = '<img src="' + wallpaperData + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="Wallpaper preview" />';
+    toast('Wallpaper loaded. Click "Save Wallpaper" to apply.');
+  };
+  reader.readAsDataURL(file);
+});
+
+$('save-wallpaper').addEventListener('click', () => {
+  if (wallpaperData) {
+    localStorage.setItem('calmset_wallpaper', wallpaperData);
+    document.body.style.backgroundImage = `url('${wallpaperData}')`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    $('remove-wallpaper-btn').style.display = 'block';
+    toast('Wallpaper saved and applied ✓');
+  } else {
+    toast('No wallpaper selected');
+  }
+});
+
+$('remove-wallpaper-btn').addEventListener('click', () => {
+  localStorage.removeItem('calmset_wallpaper');
+  document.body.style.backgroundImage = 'none';
+  document.body.style.backgroundColor = '';
+  wallpaperData = null;
+  $('wallpaper-preview').innerHTML = 'No custom wallpaper set';
+  $('wallpaper-upload').value = '';
+  $('remove-wallpaper-btn').style.display = 'none';
+  toast('Wallpaper removed');
+});
+
+/* ═══════════════════════════════════════════════
    GLOBAL CLICK OUTSIDE — CLOSE PANELS
 ═══════════════════════════════════════════════ */
 document.addEventListener('click', (e) => {
@@ -1075,6 +1100,7 @@ async function init() {
   await loadSettingsForm();
   await fetchTasks();
   await fetchStats();
+  loadWallpaperPreview();
   setMode('pomodoro');
 }
 
