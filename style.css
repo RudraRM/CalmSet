@@ -81,6 +81,7 @@ body.theme-forest {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -821,8 +822,17 @@ body::after {
 #bottom-right {
   grid-area: br;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focus-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
 }
 
 /* ── OVERLAYS & DROPDOWNS ──────────────────────── */
@@ -1248,185 +1258,109 @@ body.focus-mode #timer-display { color: var(--timer-focus); }
   font-size: 10px;
   color: var(--text-muted);
   text-align: center;
-  margin-top: 3px;
   display: block;
   letter-spacing: 0.05em;
 }
 
-/* ── RESPONSIVE & MOBILE FRIENDLY ─────────────── */
-@media (max-width: 1024px) {
-  #app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto 1fr auto auto;
-    gap: 12px;
-  }
-
-  #top-left, #top-right { grid-column: 1; }
-  #center { grid-column: 1; grid-row: 3; }
-  #bottom-left, #bottom-center, #bottom-right { grid-column: 1; display: flex; gap: 8px; }
-
-  #bottom-right {
-    justify-content: space-around;
-  }
+/* ── FULLSCREEN ACTIVE STATE ───────────────────── */
+#fullscreen-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: rgba(124,106,255,0.3);
+  color: var(--text-accent);
 }
 
-@media (max-width: 768px) {
-  body {
-    font-size: 14px;
-  }
+/* ── FOCUS MODE ACTIVE STATE ───────────────────── */
+#focus-mode-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: rgba(124,106,255,0.3);
+  color: var(--text-accent);
+}
 
+/* ── RESPONSIVE & MOBILE FRIENDLY ─────────────── */
+
+/* Tablet: 768px – 1024px */
+@media (max-width: 1024px) {
   #app {
-    padding: 12px;
-    gap: 10px;
+    grid-template-areas:
+      "tl tr"
+      "center center"
+      "bl bc"
+      "br br";
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr auto auto;
+    padding: 20px;
+    gap: 14px;
+    height: auto;
+    min-height: 100vh;
   }
 
-  #top-left {
-    order: 1;
+  html, body {
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 
   #top-right {
-    order: 2;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: flex-end;
   }
 
   #center {
-    order: 3;
+    padding: 0;
   }
 
-  #bottom-left, #bottom-center, #bottom-right {
-    order: auto;
-  }
-
-  #tasks-panel, #audio-panel, #stats-panel {
-    width: calc(100vw - 32px);
-    max-width: 100%;
-  }
-
-  #audio-panel {
-    left: auto;
-    right: 8px;
-    transform: scaleY(0) translateY(4px);
-    transform-origin: bottom right;
-  }
-
-  #audio-panel.open {
-    transform: scaleY(1) translateY(0);
-  }
-
-  #timer-display {
-    font-size: 48px;
-  }
-
-  #timer-widget {
-    width: min(340px, 88vw);
-    padding: 16px 12px;
-  }
-
-  .mode-tab {
-    font-size: 9px;
-    padding: 6px 4px;
-  }
-
-  #clock-display {
-    font-size: 36px;
-  }
-
-  .icon-btn {
-    padding: 8px 10px;
-    font-size: 11px;
-  }
-
-  .icon-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  #settings-modal {
-    flex-direction: column;
-    width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
-  }
-
-  #settings-nav {
-    width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 12px;
-    border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    white-space: nowrap;
-  }
-
-  #settings-content {
-    overflow-y: auto;
-    flex: 1;
-  }
-
-  .settings-section {
-    padding: 12px;
-  }
-
-  .settings-row {
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .glass {
-    padding: 12px;
-  }
-
-  .panel-header {
-    padding: 8px 0;
+  #bottom-left, #bottom-center {
+    align-self: end;
   }
 
   #bottom-right {
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px;
+    justify-content: flex-end;
+    align-self: end;
   }
 }
 
-@media (max-width: 480px) {
+/* Mobile: ≤768px */
+@media (max-width: 768px) {
   html, body {
-    font-size: 13px;
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
   }
 
   #app {
-    padding: 8px;
+    grid-template-areas:
+      "tl tr"
+      "center center"
+      "bl bc"
+      "br br";
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto auto;
+    padding: 14px 12px;
+    gap: 12px;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  #top-left {
     gap: 8px;
   }
 
-  #clock-display {
-    font-size: 28px;
+  #top-right {
+    gap: 6px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
-  #timer-display {
-    font-size: 40px;
+  /* Center section */
+  #center {
+    padding: 0;
+    gap: 0;
   }
 
-  #timer-widget {
-    padding: 12px 8px;
-  }
-
-  .icon-btn {
-    padding: 6px 8px;
-    font-size: 10px;
-  }
-
-  .icon-btn svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  #timer-controls {
-    gap: 4px;
-  }
-
-  .timer-ctrl {
-    width: 36px;
-    height: 36px;
+  #greeting-block {
+    margin-bottom: 16px;
   }
 
   #greeting-text {
@@ -1435,17 +1369,197 @@ body.focus-mode #timer-display { color: var(--timer-focus); }
 
   #quote-text {
     font-size: 11px;
+    max-width: 100%;
   }
 
-  #bottom-left, #bottom-center, #bottom-right {
+  #clock-display {
+    font-size: clamp(36px, 10vw, 56px);
+    margin-bottom: 6px;
+  }
+
+  /* Timer */
+  #timer-widget {
+    width: 100%;
+    max-width: 420px;
+    padding: 16px 14px;
+  }
+
+  #timer-display {
+    font-size: clamp(44px, 12vw, 64px);
+    letter-spacing: -2px;
+  }
+
+  .mode-tab {
+    font-size: 9.5px;
+    padding: 6px 4px;
+  }
+
+  #timer-controls {
+    gap: 10px;
+  }
+
+  /* Panels – full width, open upward */
+  #tasks-panel {
+    width: calc(100vw - 28px);
+    max-width: 400px;
+    left: 0;
+    right: auto;
+  }
+
+  #audio-panel {
+    width: calc(100vw - 28px);
+    max-width: 400px;
+    left: auto;
+    right: 0;
+    transform: translateX(0) scaleY(0) translateY(4px);
+    transform-origin: bottom right;
+  }
+
+  #audio-panel.open {
+    transform: translateX(0) scaleY(1) translateY(0);
+  }
+
+  /* Bottom row */
+  #bottom-left {
+    align-self: end;
+  }
+
+  #bottom-center {
+    align-self: end;
+    justify-content: flex-start;
+  }
+
+  #bottom-right {
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* Buttons */
+  .icon-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .icon-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Settings modal */
+  #settings-modal {
+    flex-direction: column;
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  #settings-nav {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 12px;
     gap: 4px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
 
-  #stats-btn, #themes-btn {
-    padding: 6px 8px;
+  .settings-nav-title {
+    display: none;
+  }
+
+  .nav-item {
+    flex-shrink: 0;
+    padding: 7px 14px;
+  }
+
+  #settings-content {
+    overflow-y: auto;
+    flex: 1;
+    padding: 20px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .settings-input,
+  .settings-select,
+  .settings-range {
+    width: 100%;
+  }
+
+  .settings-row label.toggle {
+    align-self: flex-start;
   }
 }
 
+/* Small phones: ≤480px */
+@media (max-width: 480px) {
+  #app {
+    padding: 10px 8px;
+    gap: 10px;
+  }
+
+  #clock-display {
+    font-size: clamp(30px, 9vw, 44px);
+  }
+
+  #timer-display {
+    font-size: clamp(38px, 11vw, 54px);
+  }
+
+  #timer-widget {
+    padding: 12px 10px;
+  }
+
+  .mode-tab {
+    font-size: 9px;
+    padding: 5px 3px;
+  }
+
+  .timer-ctrl {
+    width: 36px;
+    height: 36px;
+  }
+
+  #play-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  .icon-btn {
+    padding: 7px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .icon-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .streak-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  #bottom-right {
+    gap: 4px;
+  }
+
+  .focus-wrap {
+    align-items: center;
+  }
+}
+
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition-duration: 0.01ms !important;
