@@ -104,6 +104,14 @@ let pomodoroPhase = 'focus'; // 'focus' | 'short_break' | 'long_break'
 let pomodoroCount = 0;
 let sessionStartTime = null;
 
+// Timestamp anchors — keep the timer accurate even when the tab is
+// backgrounded / the user is idle (setInterval is throttled by browsers,
+// so we always recompute from real wall-clock time instead of counting ticks).
+let segStartMs = 0;        // Date.now() when the current run segment started
+let segStartTotal = 0;     // remaining seconds at the start of the segment
+let segStartElapsed = 0;   // elapsed seconds at the start of the segment
+let completionTimeout = null; // background-safe completion fallback
+
 // Timer durations from settings
 let timerSettings = { focus: 25, short: 5, long: 15 };
 
@@ -175,37 +183,81 @@ function setMode(mode) {
 }
 
 function playTimer() {
+  if (timerRunning) return;
+  // Silence any ringtone from a previous completion before starting again
+  stopAlarm();
   timerRunning = true;
   sessionStartTime = Date.now();
   $('play-icon').style.display = 'none';
   $('pause-icon').style.display = 'block';
   $('play-btn').setAttribute('aria-label', 'Pause timer');
 
-  timerInterval = setInterval(() => {
-    if (currentMode === 'stopwatch') {
-      elapsedSeconds++;
-      updateTimerDisplay();
-    } else {
-      if (totalSeconds > 0) {
-        totalSeconds--;
-        elapsedSeconds++;
+  // Anchor the segment to wall-clock time so throttled ticks never cause drift
+  segStartMs = Date.now();
+  segStartTotal = totalSeconds;
+  segStartElapsed = elapsedSeconds;
+
+  // Background-safe fallback: fire completion via setTimeout in case the
+  // interval is heavily throttled while the tab is hidden.
+  clearTimeout(completionTimeout);
+  if (currentMode !== 'stopwatch' && segStartTotal > 0) {
+    completionTimeout = setTimeout(() => {
+      if (timerRunning) {
+        totalSeconds = 0;
+        elapsedSeconds = segStartElapsed + segStartTotal;
         updateTimerDisplay();
-      } else {
         onTimerComplete();
       }
+    }, segStartTotal * 1000 + 60);
+  }
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tickTimer, 250);
+}
+
+function tickTimer() {
+  const delta = (Date.now() - segStartMs) / 1000;
+  if (currentMode === 'stopwatch') {
+    elapsedSeconds = Math.floor(segStartElapsed + delta);
+    updateTimerDisplay();
+  } else {
+    const remaining = segStartTotal - delta;
+    if (remaining > 0.05) {
+      totalSeconds = Math.max(0, Math.ceil(remaining - 0.001));
+      elapsedSeconds = Math.round(segStartElapsed + delta);
+      updateTimerDisplay();
+    } else {
+      totalSeconds = 0;
+      elapsedSeconds = segStartElapsed + segStartTotal;
+      updateTimerDisplay();
+      onTimerComplete();
     }
-  }, 1000);
+  }
 }
 
 function pauseTimer() {
+  // Freeze the displayed values from wall-clock time before stopping
+  if (timerRunning) {
+    const delta = (Date.now() - segStartMs) / 1000;
+    if (currentMode === 'stopwatch') {
+      elapsedSeconds = Math.floor(segStartElapsed + delta);
+    } else {
+      totalSeconds = Math.max(0, Math.round(segStartTotal - delta));
+      elapsedSeconds = Math.round(segStartElapsed + delta);
+    }
+  }
   timerRunning = false;
   clearInterval(timerInterval);
+  clearTimeout(completionTimeout);
   $('play-icon').style.display = 'block';
   $('pause-icon').style.display = 'none';
   $('play-btn').setAttribute('aria-label', 'Play timer');
 }
 
 function togglePlayPause() {
+  // If a ringtone is sounding, the play control silences it and moves on
+  if (alarmRinging) { acknowledgeAlarm(); return; }
+
   if (timerRunning) {
     pauseTimer();
     // Log partial session
@@ -219,15 +271,31 @@ function togglePlayPause() {
 }
 
 function resetTimer() {
+  stopAlarm();
+  pendingAfterAlarm = null;
   pauseTimer();
   elapsedSeconds = 0;
   setMode(currentMode);
   toast('Timer reset');
 }
 
+// Keep the timer honest when the user returns to an idle/backgrounded tab
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && timerRunning) {
+    const delta = (Date.now() - segStartMs) / 1000;
+    if (currentMode !== 'stopwatch' && (segStartTotal - delta) <= 0) {
+      totalSeconds = 0;
+      elapsedSeconds = segStartElapsed + segStartTotal;
+      updateTimerDisplay();
+      onTimerComplete();
+    } else {
+      tickTimer();
+    }
+  }
+});
+
 function onTimerComplete() {
   pauseTimer();
-  playAlertSound();
 
   // Log completed session
   const mins = Math.floor(elapsedSeconds / 60);
@@ -236,59 +304,74 @@ function onTimerComplete() {
     fetchStats();
   }
 
+  // Ring a continuous, gapless alarm that keeps sounding until the user
+  // presses the Stop button (shown below the play control).
+  startAlarm();
+
+  // Whatever should happen next only runs once the alarm is acknowledged.
   if (currentMode === 'pomodoro') {
     pomodoroCount++;
     if (pomodoroPhase === 'focus') {
       const breakType = pomodoroCount % 4 === 0 ? 'long_break' : 'short_break';
       const breakDur = breakType === 'long_break' ? timerSettings.long : timerSettings.short;
-      pomodoroPhase = breakType;
-      totalSeconds = breakDur * 60;
-      elapsedSeconds = 0;
-      MODES.pomodoro.duration = totalSeconds;
-      $('timer-label').textContent = breakType === 'long_break' ? 'Long break' : 'Short break';
-      $('timer-display').style.color = 'var(--timer-break)';
-      toast(`Focus complete! ${breakType === 'long_break' ? 'Long' : 'Short'} break starting…`);
-      // Auto-pause ambient if setting enabled
+      toast(`Focus complete! ${breakType === 'long_break' ? 'Long' : 'Short'} break next.`);
       if (appSettings.auto_pause_ambient) pauseAllSounds();
+      pendingAfterAlarm = () => {
+        pomodoroPhase = breakType;
+        totalSeconds = breakDur * 60;
+        elapsedSeconds = 0;
+        MODES.pomodoro.duration = totalSeconds;
+        $('timer-label').textContent = breakType === 'long_break' ? 'Long break' : 'Short break';
+        $('timer-display').style.color = 'var(--timer-break)';
+        updateTimerDisplay();
+        playTimer();
+      };
     } else {
-      pomodoroPhase = 'focus';
-      totalSeconds = timerSettings.focus * 60;
-      elapsedSeconds = 0;
-      MODES.pomodoro.duration = totalSeconds;
-      $('timer-label').textContent = 'Focus session';
-      $('timer-display').style.color = 'var(--timer-focus)';
       toast('Break over. Time to focus!');
+      pendingAfterAlarm = () => {
+        pomodoroPhase = 'focus';
+        totalSeconds = timerSettings.focus * 60;
+        elapsedSeconds = 0;
+        MODES.pomodoro.duration = totalSeconds;
+        $('timer-label').textContent = 'Focus session';
+        $('timer-display').style.color = 'var(--timer-focus)';
+        updateTimerDisplay();
+        playTimer();
+      };
     }
-    updateTimerDisplay();
-    playTimer(); // auto-advance
   } else if (currentMode === 'animedoro') {
     if ($('timer-label').textContent.includes('Focus')) {
-      totalSeconds = 20 * 60;
-      elapsedSeconds = 0;
-      MODES.animedoro.duration = totalSeconds;
-      $('timer-label').textContent = '🌸 Anime break — enjoy!';
-      $('timer-display').style.color = 'var(--timer-break)';
-      toast('Focus done! 20-minute anime break starting…');
-      updateTimerDisplay();
-      playTimer();
+      toast('Focus done! Anime break next.');
+      pendingAfterAlarm = () => {
+        totalSeconds = 20 * 60;
+        elapsedSeconds = 0;
+        MODES.animedoro.duration = totalSeconds;
+        $('timer-label').textContent = '🌸 Anime break — enjoy!';
+        $('timer-display').style.color = 'var(--timer-break)';
+        updateTimerDisplay();
+        playTimer();
+      };
     } else {
-      totalSeconds = 50 * 60;
-      elapsedSeconds = 0;
-      MODES.animedoro.duration = totalSeconds;
-      $('timer-label').textContent = 'Focus — anime break next';
-      $('timer-display').style.color = 'var(--timer-animedoro)';
       toast('Break over. Back to work!');
-      updateTimerDisplay();
+      pendingAfterAlarm = () => {
+        totalSeconds = 50 * 60;
+        elapsedSeconds = 0;
+        MODES.animedoro.duration = totalSeconds;
+        $('timer-label').textContent = 'Focus — anime break next';
+        $('timer-display').style.color = 'var(--timer-animedoro)';
+        updateTimerDisplay();
+      };
     }
   } else {
     toast('Timer complete! 🎉');
-    setMode(currentMode);
+    pendingAfterAlarm = () => { setMode(currentMode); };
   }
 }
 
 // Timer controls
 $('play-btn').addEventListener('click', togglePlayPause);
 $('reset-btn').addEventListener('click', resetTimer);
+$('stop-alarm-btn').addEventListener('click', acknowledgeAlarm);
 
 document.querySelectorAll('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => setMode(tab.dataset.mode));
@@ -453,62 +536,85 @@ function getAlertCtx() {
 document.addEventListener('click', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
 document.addEventListener('keydown', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
 
-function playAlertSound() {
-  try {
-    const ctx = getAlertCtx();
-    const sound = appSettings.alert_sound || 'digital_bell';
-    const vol = (appSettings.alert_volume || 70) / 100;
+/* Continuous ringtone: a two-tone alarm that never falls silent.
+   The gain stays constant while a square-wave LFO alternates the pitch,
+   so there are no gaps — it rings until the user presses Stop. */
+let alarmRinging = false;
+let alarmNodes = [];
+let alarmMaster = null;
+let pendingAfterAlarm = null;
 
-    // Play 3 repetitions of the chosen sound so it's unmissable
-    const reps = 3;
-    for (let rep = 0; rep < reps; rep++) {
-      const repOffset = rep * 1.5; // space each repetition 1.5s apart
+function startAlarm() {
+  if (!alarmRinging) {
+    try {
+      const ctx = getAlertCtx();
+      const vol = (appSettings.alert_volume || 70) / 100;
+      const sound = appSettings.alert_sound || 'digital_bell';
 
-      if (sound === 'digital_bell') {
-        const gain = ctx.createGain();
-        gain.connect(ctx.destination);
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime + repOffset);
-        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + repOffset + 0.6);
-        gain.gain.setValueAtTime(vol, ctx.currentTime + repOffset);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + repOffset + 1.1);
-        osc.connect(gain);
-        osc.start(ctx.currentTime + repOffset);
-        osc.stop(ctx.currentTime + repOffset + 1.1);
-      } else if (sound === 'bird_chirp') {
-        [0, 0.12, 0.24].forEach((delay, i) => {
-          const t = ctx.currentTime + repOffset + delay;
-          const o = ctx.createOscillator();
-          o.type = 'sine';
-          o.frequency.setValueAtTime(1200 + i * 200, t);
-          o.frequency.exponentialRampToValueAtTime(1600 + i * 100, t + 0.08);
-          const g = ctx.createGain();
-          g.gain.setValueAtTime(vol * 0.8, t);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-          o.connect(g); g.connect(ctx.destination);
-          o.start(t);
-          o.stop(t + 0.2);
-        });
-      } else {
-        // Lofi chime
-        [0, 0.35, 0.7].forEach((delay, i) => {
-          const t = ctx.currentTime + repOffset + delay;
-          const o = ctx.createOscillator();
-          o.type = 'triangle';
-          o.frequency.value = [528, 660, 792][i];
-          const g = ctx.createGain();
-          g.gain.setValueAtTime(vol * 0.7, t);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-          o.connect(g); g.connect(ctx.destination);
-          o.start(t);
-          o.stop(t + 0.9);
-        });
-      }
+      const master = ctx.createGain();
+      master.gain.value = Math.min(0.7, vol * 0.7);
+      master.connect(ctx.destination);
+
+      // Frequency pair for the constant two-tone alarm
+      const freqs = sound === 'bird_chirp' ? [1300, 1900]
+                  : sound === 'lofi_chime' ? [523, 659]
+                  : [660, 988]; // digital_bell (default)
+      const centre = (freqs[0] + freqs[1]) / 2;
+      const swing = Math.abs(freqs[1] - freqs[0]) / 2;
+
+      const osc = ctx.createOscillator();
+      osc.type = sound === 'lofi_chime' ? 'triangle' : 'sine';
+      osc.frequency.value = centre;
+
+      // Square LFO snaps between the two tones — constant, gapless ring
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square';
+      lfo.frequency.value = sound === 'bird_chirp' ? 6 : 3;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = swing;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+
+      osc.connect(master);
+      osc.start();
+      lfo.start();
+
+      alarmNodes = [osc, lfo];
+      alarmMaster = master;
+      alarmRinging = true;
+    } catch (e) {
+      console.warn('Alarm error:', e);
     }
-  } catch(e) {
-    console.warn('Alert sound error:', e);
   }
+
+  // Reveal the Stop button beneath the play control
+  const stopBtn = $('stop-alarm-btn');
+  if (stopBtn) stopBtn.style.display = 'inline-flex';
+  document.body.classList.add('alarm-active');
+}
+
+function stopAlarm() {
+  alarmNodes.forEach(n => {
+    try { n.stop(); } catch (e) {}
+    try { n.disconnect(); } catch (e) {}
+  });
+  alarmNodes = [];
+  if (alarmMaster) { try { alarmMaster.disconnect(); } catch (e) {} alarmMaster = null; }
+  alarmRinging = false;
+
+  const stopBtn = $('stop-alarm-btn');
+  if (stopBtn) stopBtn.style.display = 'none';
+  document.body.classList.remove('alarm-active');
+}
+
+// Stop the ringtone and continue to whatever comes next (break / next focus)
+function acknowledgeAlarm() {
+  const wasRinging = alarmRinging;
+  stopAlarm();
+  const next = pendingAfterAlarm;
+  pendingAfterAlarm = null;
+  if (next) next();
+  if (wasRinging) toast('Ringtone stopped');
 }
 
 /* ═══════════════════════════════════════════════

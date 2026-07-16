@@ -439,6 +439,47 @@ body::after {
   height: 18px;
 }
 
+/* ── STOP RINGTONE BUTTON ──────────────────────── */
+.stop-alarm-btn {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 26px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  animation: alarmPulse 1s var(--ease-out) infinite;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.stop-alarm-btn:hover {
+  background: rgba(248, 113, 113, 0.3);
+  color: #fecaca;
+}
+
+.stop-alarm-btn:active { transform: scale(0.98); }
+
+.stop-alarm-btn svg { width: 14px; height: 14px; }
+
+@keyframes alarmPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.45); }
+  50%      { box-shadow: 0 0 0 9px rgba(248, 113, 113, 0); }
+}
+
+/* Emphasise the timer widget while the ringtone is sounding */
+body.alarm-active #timer-widget {
+  border-color: rgba(248, 113, 113, 0.4);
+  box-shadow: 0 0 34px rgba(248, 113, 113, 0.16);
+}
+
 /* ── BOTTOM LEFT: TASKS ────────────────────────── */
 #bottom-left {
   grid-area: bl;
