@@ -302,161 +302,213 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 });
 
 /* ── PICTURE IN PICTURE ──────────────────────── */
+let pipAnimFrame = null;
+
 $('pip-btn').addEventListener('click', async () => {
   try {
-    if (!document.pictureInPictureElement) {
-      // Draw timer to canvas and stream to video (works in Chrome, Edge, Safari)
-      const canvas = document.createElement('canvas');
-      canvas.width = 320; canvas.height = 160;
-      const ctx = canvas.getContext('2d');
-
-      function drawPip() {
-        ctx.clearRect(0, 0, 320, 160);
-        ctx.fillStyle = '#0d1117';
-        ctx.fillRect(0, 0, 320, 160);
-        ctx.fillStyle = 'rgba(124,106,255,0.15)';
-        ctx.fillRect(0, 0, 320, 160);
-        ctx.fillStyle = '#e8e4ff';
-        ctx.font = '600 52px Space Grotesk, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const display = currentMode === 'stopwatch' ? elapsedSeconds : totalSeconds;
-        ctx.fillText(formatTime(display), 160, 72);
-        ctx.fillStyle = 'rgba(167,139,250,0.7)';
-        ctx.font = '400 14px Inter, sans-serif';
-        ctx.fillText($('timer-label').textContent, 160, 120);
-        if (timerRunning) requestAnimationFrame(drawPip);
-      }
-
-      drawPip();
-      const stream = canvas.captureStream(2);
-      const video = $('pip-video');
-      video.srcObject = stream;
-      video.style.display = 'block';
-      await video.play();
-
-      // Cross-browser PiP support (Chrome, Edge, Safari 15.1+)
-      if (video.requestPictureInPicture) {
-        await video.requestPictureInPicture();
-      } else if (document.documentElement.requestFullscreen) {
-        // Fallback for browsers without PiP
-        toast('Picture-in-Picture not supported, use fullscreen instead');
-        return;
-      }
-
-      video.style.display = 'none';
-      toast('Timer in Picture-in-Picture');
-    } else {
+    // Exit PiP if already active
+    if (document.pictureInPictureElement ||
+        (document.webkitCurrentFullScreenElement && $('pip-video').webkitDisplayingFullscreen)) {
       if (document.exitPictureInPicture) {
         await document.exitPictureInPicture();
+      } else if ($('pip-video').webkitExitPictureInPicture) {
+        $('pip-video').webkitExitPictureInPicture();
       }
       toast('PiP closed');
+      return;
     }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 160;
+    const ctx = canvas.getContext('2d');
+
+    function drawPip() {
+      ctx.clearRect(0, 0, 320, 160);
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, 320, 160);
+      ctx.fillStyle = 'rgba(124,106,255,0.15)';
+      ctx.fillRect(0, 0, 320, 160);
+      ctx.fillStyle = '#e8e4ff';
+      ctx.font = '600 52px Space Grotesk, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const display = currentMode === 'stopwatch' ? elapsedSeconds : totalSeconds;
+      ctx.fillText(formatTime(display), 160, 72);
+      ctx.fillStyle = 'rgba(167,139,250,0.7)';
+      ctx.font = '400 14px Inter, sans-serif';
+      ctx.fillText($('timer-label').textContent, 160, 120);
+      pipAnimFrame = requestAnimationFrame(drawPip);
+    }
+
+    // Check for captureStream support (Chrome, Edge, Safari 11+)
+    const captureStreamFn = canvas.captureStream || canvas.mozCaptureStream;
+    if (!captureStreamFn) {
+      toast('PiP not supported — use Fullscreen instead');
+      return;
+    }
+
+    drawPip();
+    const stream = captureStreamFn.call(canvas, 30);
+    const video = $('pip-video');
+    video.srcObject = stream;
+
+    // Safari requires the video to be in the DOM and visible briefly
+    video.style.display = 'block';
+    video.style.position = 'fixed';
+    video.style.top = '-9999px';
+
+    await video.play().catch(() => {});
+
+    // Chrome/Edge: standard PiP
+    if (video.requestPictureInPicture) {
+      await video.requestPictureInPicture();
+      video.style.display = 'none';
+      toast('Timer in Picture-in-Picture');
+    }
+    // Safari 14+: webkit PiP
+    else if (video.webkitSupportsPresentationMode &&
+             video.webkitSupportsPresentationMode('picture-in-picture')) {
+      video.webkitSetPresentationMode('picture-in-picture');
+      toast('Timer in Picture-in-Picture');
+    }
+    else {
+      // Fallback: enter fullscreen with the pip video visible
+      if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
+      video.style.display = 'none';
+      toast('PiP not supported — try Fullscreen mode');
+    }
+
+    video.addEventListener('leavepictureinpicture', () => {
+      if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
+      video.style.display = 'none';
+    }, { once: true });
+    video.addEventListener('webkitpresentationmodechanged', () => {
+      if (video.webkitPresentationMode !== 'picture-in-picture') {
+        if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
+        video.style.display = 'none';
+      }
+    }, { once: true });
   } catch (e) {
+    console.warn('PiP error:', e);
     toast('Picture-in-Picture not supported in this browser');
   }
 });
 
 /* ── FULLSCREEN MODE ─────────────────────────── */
-$('fullscreen-btn').addEventListener('click', () => {
-  const appEl = $('app');
+function isFullscreen() {
+  return !!(document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement);
+}
 
-  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
-    // Enter fullscreen (cross-browser support)
-    if (appEl.requestFullscreen) {
-      appEl.requestFullscreen().catch(err => {
-        toast(`Error entering fullscreen: ${err.message}`);
-      });
-    } else if (appEl.webkitRequestFullscreen) {
-      // Safari & older Chrome
-      appEl.webkitRequestFullscreen();
-    } else if (appEl.mozRequestFullScreen) {
-      // Firefox
-      appEl.mozRequestFullScreen();
+function syncFullscreenBtn() {
+  const on = isFullscreen();
+  $('fullscreen-btn').setAttribute('aria-pressed', on);
+  // Swap icon between expand and compress
+  const btn = $('fullscreen-btn');
+  btn.innerHTML = on
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>Exit Full`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>Fullscreen`;
+}
+
+$('fullscreen-btn').addEventListener('click', () => {
+  const docEl = document.documentElement;
+
+  if (!isFullscreen()) {
+    const req = docEl.requestFullscreen ||
+                docEl.webkitRequestFullscreen ||
+                docEl.mozRequestFullScreen ||
+                docEl.msRequestFullscreen;
+    if (req) {
+      req.call(docEl).catch(err => toast('Fullscreen: ' + err.message));
     } else {
-      toast('Fullscreen not supported');
+      toast('Fullscreen not supported in this browser');
     }
-    $('fullscreen-btn').setAttribute('aria-pressed', 'true');
-    toast('Fullscreen mode on');
   } else {
-    // Exit fullscreen (cross-browser support)
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    } else if (document.mozCancelFullScreen) {
-      document.mozCancelFullScreen();
-    }
-    $('fullscreen-btn').setAttribute('aria-pressed', 'false');
-    toast('Fullscreen mode off');
+    const exit = document.exitFullscreen ||
+                 document.webkitExitFullscreen ||
+                 document.mozCancelFullScreen ||
+                 document.msExitFullscreen;
+    if (exit) exit.call(document);
   }
 });
 
-// Listen for fullscreen changes to sync button state
-document.addEventListener('fullscreenchange', () => {
-  $('fullscreen-btn').setAttribute('aria-pressed', !!document.fullscreenElement);
-});
-document.addEventListener('webkitfullscreenchange', () => {
-  $('fullscreen-btn').setAttribute('aria-pressed', !!document.webkitFullscreenElement);
-});
-document.addEventListener('mozfullscreenchange', () => {
-  $('fullscreen-btn').setAttribute('aria-pressed', !!document.mozFullScreenElement);
+// Sync button on any fullscreen change (Chrome, Edge, Safari, Firefox)
+['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt => {
+  document.addEventListener(evt, syncFullscreenBtn);
 });
 
-/* ── ALERT SOUND ─────────────────────────────── */
+/* ── ALERT SOUND (ringtone on timer complete) ─── */
 let alertCtx = null;
 let appSettings = {};
 
+// Unlock AudioContext on first user gesture (required by all browsers)
+function getAlertCtx() {
+  if (!alertCtx) alertCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Resume if suspended (Safari / Chrome autoplay policy)
+  if (alertCtx.state === 'suspended') alertCtx.resume();
+  return alertCtx;
+}
+
+document.addEventListener('click', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
+document.addEventListener('keydown', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
+
 function playAlertSound() {
   try {
-    if (!alertCtx) alertCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const ctx = alertCtx;
+    const ctx = getAlertCtx();
     const sound = appSettings.alert_sound || 'digital_bell';
     const vol = (appSettings.alert_volume || 70) / 100;
 
-    const gain = ctx.createGain();
-    gain.gain.value = vol;
-    gain.connect(ctx.destination);
+    // Play 3 repetitions of the chosen sound so it's unmissable
+    const reps = 3;
+    for (let rep = 0; rep < reps; rep++) {
+      const repOffset = rep * 1.5; // space each repetition 1.5s apart
 
-    if (sound === 'digital_bell') {
-      // Synthesize a simple bell
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
-      gain.gain.setValueAtTime(vol, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
-      osc.connect(gain);
-      osc.start();
-      osc.stop(ctx.currentTime + 1.2);
-    } else if (sound === 'bird_chirp') {
-      [0, 0.12, 0.24].forEach((delay, i) => {
-        const o = ctx.createOscillator();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(1200 + i * 200, ctx.currentTime + delay);
-        o.frequency.exponentialRampToValueAtTime(1600 + i * 100, ctx.currentTime + delay + 0.08);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(vol * 0.6, ctx.currentTime + delay);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.15);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(ctx.currentTime + delay);
-        o.stop(ctx.currentTime + delay + 0.2);
-      });
-    } else {
-      // Lofi chime
-      [0, 0.3, 0.6].forEach((delay) => {
-        const o = ctx.createOscillator();
-        o.type = 'triangle';
-        o.frequency.value = [528, 660, 792][Math.floor(delay * 3.33)];
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(vol * 0.5, ctx.currentTime + delay);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.8);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(ctx.currentTime + delay);
-        o.stop(ctx.currentTime + delay + 0.8);
-      });
+      if (sound === 'digital_bell') {
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime + repOffset);
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + repOffset + 0.6);
+        gain.gain.setValueAtTime(vol, ctx.currentTime + repOffset);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + repOffset + 1.1);
+        osc.connect(gain);
+        osc.start(ctx.currentTime + repOffset);
+        osc.stop(ctx.currentTime + repOffset + 1.1);
+      } else if (sound === 'bird_chirp') {
+        [0, 0.12, 0.24].forEach((delay, i) => {
+          const t = ctx.currentTime + repOffset + delay;
+          const o = ctx.createOscillator();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(1200 + i * 200, t);
+          o.frequency.exponentialRampToValueAtTime(1600 + i * 100, t + 0.08);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(vol * 0.8, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(t);
+          o.stop(t + 0.2);
+        });
+      } else {
+        // Lofi chime
+        [0, 0.35, 0.7].forEach((delay, i) => {
+          const t = ctx.currentTime + repOffset + delay;
+          const o = ctx.createOscillator();
+          o.type = 'triangle';
+          o.frequency.value = [528, 660, 792][i];
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(vol * 0.7, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(t);
+          o.stop(t + 0.9);
+        });
+      }
     }
-  } catch(e) { /* audio not available */ }
+  } catch(e) {
+    console.warn('Alert sound error:', e);
+  }
 }
 
 /* ═══════════════════════════════════════════════
@@ -469,6 +521,7 @@ const gainNodes = {};
 // Generate ambient sounds procedurally (no file deps)
 function getAudioContext() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
 
