@@ -227,7 +227,7 @@ function resetTimer() {
 
 function onTimerComplete() {
   pauseTimer();
-  playAlertSound();
+  playAlertSound().catch(e => console.warn('Alert sound error:', e));
 
   // Log completed session
   const mins = Math.floor(elapsedSeconds / 60);
@@ -446,16 +446,19 @@ let appSettings = {};
 function getAlertCtx() {
   if (!alertCtx) alertCtx = new (window.AudioContext || window.webkitAudioContext)();
   // Resume if suspended (Safari / Chrome autoplay policy)
-  if (alertCtx.state === 'suspended') alertCtx.resume();
+  if (alertCtx.state === 'suspended') alertCtx.resume().catch(() => {});
   return alertCtx;
 }
 
 document.addEventListener('click', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
 document.addEventListener('keydown', () => { try { getAlertCtx(); } catch(e){} }, { once: true });
 
-function playAlertSound() {
+async function playAlertSound() {
   try {
     const ctx = getAlertCtx();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
     const sound = appSettings.alert_sound || 'digital_bell';
     const vol = (appSettings.alert_volume || 70) / 100;
 
