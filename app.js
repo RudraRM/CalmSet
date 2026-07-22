@@ -227,7 +227,8 @@ function resetTimer() {
 
 function onTimerComplete() {
   pauseTimer();
-  playAlertSound().catch(e => console.warn('Alert sound error:', e));
+  playContinuousRingtone();
+  showTimerCompleteModal();
 
   // Log completed session
   const mins = Math.floor(elapsedSeconds / 60);
@@ -235,6 +236,11 @@ function onTimerComplete() {
     api('/stats/session', 'POST', { minutes: mins, mode: currentMode });
     fetchStats();
   }
+}
+
+function handleTimerStop() {
+  stopContinuousRingtone();
+  closeTimerCompleteModal();
 
   if (currentMode === 'pomodoro') {
     pomodoroCount++;
@@ -250,6 +256,8 @@ function onTimerComplete() {
       toast(`Focus complete! ${breakType === 'long_break' ? 'Long' : 'Short'} break starting…`);
       // Auto-pause ambient if setting enabled
       if (appSettings.auto_pause_ambient) pauseAllSounds();
+      updateTimerDisplay();
+      playTimer(); // auto-advance
     } else {
       pomodoroPhase = 'focus';
       totalSeconds = timerSettings.focus * 60;
@@ -258,9 +266,9 @@ function onTimerComplete() {
       $('timer-label').textContent = 'Focus session';
       $('timer-display').style.color = 'var(--timer-focus)';
       toast('Break over. Time to focus!');
+      updateTimerDisplay();
+      playTimer(); // auto-advance
     }
-    updateTimerDisplay();
-    playTimer(); // auto-advance
   } else if (currentMode === 'animedoro') {
     if ($('timer-label').textContent.includes('Focus')) {
       totalSeconds = 20 * 60;
@@ -286,9 +294,37 @@ function onTimerComplete() {
   }
 }
 
+function showTimerCompleteModal() {
+  const overlay = $('timer-complete-overlay');
+  overlay.style.display = 'flex';
+  overlay.setAttribute('aria-hidden', 'false');
+  $('stop-timer-btn').focus();
+}
+
+function closeTimerCompleteModal() {
+  const overlay = $('timer-complete-overlay');
+  overlay.style.display = 'none';
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
 // Timer controls
 $('play-btn').addEventListener('click', togglePlayPause);
 $('reset-btn').addEventListener('click', resetTimer);
+$('stop-timer-btn').addEventListener('click', handleTimerStop);
+
+// Close modal on overlay click
+$('timer-complete-overlay').addEventListener('click', (e) => {
+  if (e.target === $('timer-complete-overlay')) {
+    handleTimerStop();
+  }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('timer-complete-overlay').getAttribute('aria-hidden') === 'false') {
+    handleTimerStop();
+  }
+}, { capture: true });
 
 document.querySelectorAll('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => setMode(tab.dataset.mode));
@@ -441,6 +477,8 @@ $('fullscreen-btn').addEventListener('click', () => {
 /* ── ALERT SOUND (ringtone on timer complete) ─── */
 let alertCtx = null;
 let appSettings = {};
+let continuousRingtoneActive = false;
+let continuousRingtoneId = null;
 
 // Unlock AudioContext on first user gesture (required by all browsers)
 function getAlertCtx() {
@@ -511,6 +549,80 @@ async function playAlertSound() {
     }
   } catch(e) {
     console.warn('Alert sound error:', e);
+  }
+}
+
+function playContinuousRingtone() {
+  continuousRingtoneActive = true;
+  const sound = appSettings.alert_sound || 'digital_bell';
+  const vol = (appSettings.alert_volume || 70) / 100;
+
+  function playRingtoneRepetition() {
+    if (!continuousRingtoneActive) return;
+
+    try {
+      const ctx = getAlertCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      if (sound === 'digital_bell') {
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.6);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.1);
+        osc.connect(gain);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.1);
+      } else if (sound === 'bird_chirp') {
+        [0, 0.12, 0.24].forEach((delay, i) => {
+          const t = ctx.currentTime + delay;
+          const o = ctx.createOscillator();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(1200 + i * 200, t);
+          o.frequency.exponentialRampToValueAtTime(1600 + i * 100, t + 0.08);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(vol * 0.8, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(t);
+          o.stop(t + 0.2);
+        });
+      } else {
+        [0, 0.35, 0.7].forEach((delay, i) => {
+          const t = ctx.currentTime + delay;
+          const o = ctx.createOscillator();
+          o.type = 'triangle';
+          o.frequency.value = [528, 660, 792][i];
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(vol * 0.7, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(t);
+          o.stop(t + 0.9);
+        });
+      }
+
+      if (continuousRingtoneActive) {
+        continuousRingtoneId = setTimeout(playRingtoneRepetition, 1500);
+      }
+    } catch(e) {
+      console.warn('Continuous ringtone error:', e);
+    }
+  }
+
+  playRingtoneRepetition();
+}
+
+function stopContinuousRingtone() {
+  continuousRingtoneActive = false;
+  if (continuousRingtoneId) {
+    clearTimeout(continuousRingtoneId);
+    continuousRingtoneId = null;
   }
 }
 

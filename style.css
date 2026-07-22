@@ -1211,6 +1211,29 @@ body::after {
   box-shadow: 0 0 14px var(--accent-glow);
 }
 
+/* ── TIMER COMPLETE MODAL ──────────────────────── */
+.stop-timer-btn {
+  padding: 12px 32px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.stop-timer-btn:hover {
+  background: #8b7bff;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.stop-timer-btn:active {
+  transform: scale(0.98);
+}
+
 /* ── CLEAR MODE ────────────────────────────────── */
 body.clear-mode #top-left,
 body.clear-mode #top-right,
