@@ -21,9 +21,7 @@ def load_data():
                 'short_break': 5,
                 'long_break': 15,
                 'alert_sound': 'digital_bell',
-                'alert_volume': 70,
-                'master_volume': 80,
-                'auto_pause_ambient': True
+                'alert_volume': 70
             },
             'stats': {
                 'total_focus_minutes': 0,

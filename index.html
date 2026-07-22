@@ -192,59 +192,6 @@
     </button>
   </div>
 
-  <!-- ── BOTTOM CENTER: AUDIO ───────────────────── -->
-  <div id="bottom-center" style="position:relative">
-    <!-- Audio Panel -->
-    <div class="glass" id="audio-panel" role="dialog" aria-label="Ambient audio mixer" aria-hidden="true">
-      <div class="panel-header">
-        <span class="panel-title">Soundscapes</span>
-        <span style="font-size:10px;color:var(--text-muted)">blend freely</span>
-      </div>
-
-      <!-- Sound rows -->
-      <div class="audio-row">
-        <button class="sound-toggle" data-sound="rain" aria-label="Toggle rain sound" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9"/><path d="M16 14v6M8 14v6M12 16v6"/></svg>
-        </button>
-        <span class="sound-name">Rain</span>
-        <input type="range" class="sound-vol" min="0" max="100" value="60" data-sound="rain" aria-label="Rain volume" />
-        <span class="vol-pct">60%</span>
-      </div>
-
-      <div class="audio-row">
-        <button class="sound-toggle" data-sound="fire" aria-label="Toggle fireplace sound" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12c0-3 2-5 2-8a5 5 0 0 0-9 2c0 2 1 3 1 5"/><path d="M14.5 17.5A4.5 4.5 0 0 1 7 17c0-3 2.5-5 2.5-5"/><path d="M10 22a7 7 0 0 1 7-7 2.5 2.5 0 0 0-2.5-2.5"/></svg>
-        </button>
-        <span class="sound-name">Fireplace</span>
-        <input type="range" class="sound-vol" min="0" max="100" value="50" data-sound="fire" aria-label="Fireplace volume" />
-        <span class="vol-pct">50%</span>
-      </div>
-
-      <div class="audio-row">
-        <button class="sound-toggle" data-sound="cafe" aria-label="Toggle coffee shop sound" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>
-        </button>
-        <span class="sound-name">Coffee Shop</span>
-        <input type="range" class="sound-vol" min="0" max="100" value="45" data-sound="cafe" aria-label="Coffee shop volume" />
-        <span class="vol-pct">45%</span>
-      </div>
-
-      <div class="audio-row">
-        <button class="sound-toggle" data-sound="noise" aria-label="Toggle brown noise" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9 2 0"/></svg>
-        </button>
-        <span class="sound-name">Brown Noise</span>
-        <input type="range" class="sound-vol" min="0" max="100" value="40" data-sound="noise" aria-label="Brown noise volume" />
-        <span class="vol-pct">40%</span>
-      </div>
-    </div>
-
-    <button class="icon-btn" id="audio-trigger" aria-label="Open soundscapes" aria-expanded="false" aria-controls="audio-panel">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-      Soundscapes
-    </button>
-  </div>
-
   <!-- ── BOTTOM RIGHT: FULLSCREEN + FOCUS MODE + SETTINGS ───── -->
   <div id="bottom-right">
     <button class="icon-btn" id="fullscreen-btn" aria-label="Toggle fullscreen" aria-pressed="false" title="Fullscreen">
@@ -280,7 +227,6 @@
       <div class="settings-nav-title">Settings</div>
       <button class="nav-item active" data-section="general">General</button>
       <button class="nav-item" data-section="timer">Focus Timer</button>
-      <button class="nav-item" data-section="audio">Audio & Sound</button>
       <button class="nav-item" data-section="profile">Profile & Plan</button>
       <button class="nav-item" data-section="wallpaper">Wallpaper</button>
     </nav>
@@ -363,30 +309,6 @@
         <button class="save-btn" id="save-timer">Save changes</button>
       </div>
 
-      <!-- AUDIO -->
-      <div class="settings-section" id="section-audio">
-        <h2 class="settings-section-title">Audio & Sound</h2>
-        <p class="settings-section-sub">Master control for all sounds</p>
-
-        <div class="settings-row">
-          <div class="settings-label">Master volume<small><span id="master-vol-val">80</span>%</small></div>
-          <input type="range" class="settings-range" id="s-master-vol" min="0" max="100" value="80" aria-label="Master volume" />
-        </div>
-        <div class="settings-row">
-          <div class="settings-label">
-            Auto-pause ambient on break
-            <small>Pauses sound loops during break intervals</small>
-          </div>
-          <label class="toggle" aria-label="Auto-pause ambient toggle">
-            <input type="checkbox" id="s-auto-pause" checked />
-            <div class="toggle-track"></div>
-            <div class="toggle-thumb"></div>
-          </label>
-        </div>
-
-        <button class="save-btn" id="save-audio">Save changes</button>
-      </div>
-
       <!-- PROFILE -->
       <div class="settings-section" id="section-profile">
         <h2 class="settings-section-title">Profile & Plan</h2>
@@ -449,8 +371,10 @@
 </div>
 <!-- /settings-overlay -->
 
-<!-- PiP video element (hidden) -->
-<video id="pip-video" style="display:none" autoplay muted loop></video>
+<!-- PiP video element — kept off-screen (not display:none) so browsers keep decoding frames -->
+<video id="pip-video" aria-hidden="true" tabindex="-1"
+  style="position:fixed;top:-9999px;left:-9999px;width:2px;height:2px;opacity:0;pointer-events:none;"
+  autoplay muted loop playsinline></video>
 
 <!-- Timer Complete Modal -->
 <div id="timer-complete-overlay" role="dialog" aria-modal="true" aria-label="Timer Complete" aria-hidden="true" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:9999;">
@@ -465,12 +389,6 @@
 
 <!-- Toast notification -->
 <div id="toast" role="status" aria-live="polite"></div>
-
-<!-- Hidden audio elements -->
-<audio id="audio-rain" loop></audio>
-<audio id="audio-fire" loop></audio>
-<audio id="audio-cafe" loop></audio>
-<audio id="audio-noise" loop></audio>
 
 <script src="app.js"></script>
 </body>

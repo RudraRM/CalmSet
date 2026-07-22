@@ -129,6 +129,8 @@ function updateTimerDisplay() {
     fill.style.width = Math.min(100, Math.max(0, pct)) + '%';
     $('progress-track').setAttribute('aria-valuenow', Math.round(pct));
   }
+
+  updatePipFrame();
 }
 
 function setMode(mode) {
@@ -254,8 +256,6 @@ function handleTimerStop() {
       $('timer-label').textContent = breakType === 'long_break' ? 'Long break' : 'Short break';
       $('timer-display').style.color = 'var(--timer-break)';
       toast(`Focus complete! ${breakType === 'long_break' ? 'Long' : 'Short'} break starting…`);
-      // Auto-pause ambient if setting enabled
-      if (appSettings.auto_pause_ambient) pauseAllSounds();
       updateTimerDisplay();
       playTimer(); // auto-advance
     } else {
@@ -338,97 +338,128 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 });
 
 /* ── PICTURE IN PICTURE ──────────────────────── */
-let pipAnimFrame = null;
+// Friendly names for the PiP overlay — matches the mode tab labels
+const PIP_TYPE_LABELS = {
+  pomodoro: 'Pomodoro',
+  countdown: 'Countdown',
+  stopwatch: 'Stopwatch',
+  animedoro: 'Animedoro'
+};
+
+let pipCanvas = null;
+let pipCtx = null;
+let pipReady = false;
+
+function drawPipFrame() {
+  if (!pipCtx) return;
+  const W = pipCanvas.width, H = pipCanvas.height;
+
+  pipCtx.clearRect(0, 0, W, H);
+  pipCtx.fillStyle = '#0d1117';
+  pipCtx.fillRect(0, 0, W, H);
+  pipCtx.fillStyle = 'rgba(124,106,255,0.15)';
+  pipCtx.fillRect(0, 0, W, H);
+
+  const display = currentMode === 'stopwatch' ? elapsedSeconds : totalSeconds;
+  pipCtx.fillStyle = '#e8e4ff';
+  pipCtx.font = '600 56px "Space Grotesk", monospace';
+  pipCtx.textAlign = 'center';
+  pipCtx.textBaseline = 'middle';
+  pipCtx.fillText(formatTime(display), W / 2, H / 2 - 12);
+
+  pipCtx.fillStyle = 'rgba(167,139,250,0.85)';
+  pipCtx.font = '600 15px Inter, sans-serif';
+  const typeLabel = PIP_TYPE_LABELS[currentMode] || 'Timer';
+  pipCtx.fillText(typeLabel.toUpperCase(), W / 2, H / 2 + 38);
+}
+
+// Called whenever the timer display changes, keeps the PiP frame in sync
+function updatePipFrame() {
+  if (pipReady) drawPipFrame();
+}
+
+// Warm up the canvas → MediaStream → <video> pipeline ahead of time so the
+// PiP request can fire synchronously inside the click handler (required by
+// Chrome's and Safari's user-gesture rules — an await beforehand can cause
+// the request to be silently rejected).
+function setupPip() {
+  if (pipReady) return;
+
+  pipCanvas = document.createElement('canvas');
+  pipCanvas.width = 320;
+  pipCanvas.height = 160;
+  pipCtx = pipCanvas.getContext('2d');
+  drawPipFrame();
+
+  const captureStreamFn = pipCanvas.captureStream || pipCanvas.mozCaptureStream;
+  if (!captureStreamFn) return;
+
+  const video = $('pip-video');
+  video.muted = true;
+  video.playsInline = true;
+  video.srcObject = captureStreamFn.call(pipCanvas, 4); // 4fps — plenty for a once-a-second clock
+  video.play().catch(() => {});
+  pipReady = true;
+}
+
+function isPipActive() {
+  const video = $('pip-video');
+  return document.pictureInPictureElement === video ||
+         video.webkitPresentationMode === 'picture-in-picture';
+}
+
+async function exitPip() {
+  const video = $('pip-video');
+  if (document.pictureInPictureElement === video && document.exitPictureInPicture) {
+    await document.exitPictureInPicture();
+  } else if (video.webkitSetPresentationMode) {
+    video.webkitSetPresentationMode('inline');
+  }
+}
+
+async function enterPip() {
+  setupPip();
+  const video = $('pip-video');
+  if (!pipReady) {
+    throw new Error('Picture-in-Picture canvas capture is not supported in this browser');
+  }
+
+  // Chrome, Edge, Firefox (standard API)
+  if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
+    await video.requestPictureInPicture();
+  }
+  // Safari desktop & iOS 14+ (webkit-prefixed API)
+  else if (video.webkitSupportsPresentationMode &&
+           video.webkitSupportsPresentationMode('picture-in-picture')) {
+    video.webkitSetPresentationMode('picture-in-picture');
+  }
+  else {
+    throw new Error('Picture-in-Picture is not supported in this browser');
+  }
+}
 
 $('pip-btn').addEventListener('click', async () => {
   try {
-    // Exit PiP if already active
-    if (document.pictureInPictureElement ||
-        (document.webkitCurrentFullScreenElement && $('pip-video').webkitDisplayingFullscreen)) {
-      if (document.exitPictureInPicture) {
-        await document.exitPictureInPicture();
-      } else if ($('pip-video').webkitExitPictureInPicture) {
-        $('pip-video').webkitExitPictureInPicture();
-      }
+    if (isPipActive()) {
+      await exitPip();
       toast('PiP closed');
       return;
     }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 320; canvas.height = 160;
-    const ctx = canvas.getContext('2d');
-
-    function drawPip() {
-      ctx.clearRect(0, 0, 320, 160);
-      ctx.fillStyle = '#0d1117';
-      ctx.fillRect(0, 0, 320, 160);
-      ctx.fillStyle = 'rgba(124,106,255,0.15)';
-      ctx.fillRect(0, 0, 320, 160);
-      ctx.fillStyle = '#e8e4ff';
-      ctx.font = '600 52px Space Grotesk, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const display = currentMode === 'stopwatch' ? elapsedSeconds : totalSeconds;
-      ctx.fillText(formatTime(display), 160, 72);
-      ctx.fillStyle = 'rgba(167,139,250,0.7)';
-      ctx.font = '400 14px Inter, sans-serif';
-      ctx.fillText($('timer-label').textContent, 160, 120);
-      pipAnimFrame = requestAnimationFrame(drawPip);
-    }
-
-    // Check for captureStream support (Chrome, Edge, Safari 11+)
-    const captureStreamFn = canvas.captureStream || canvas.mozCaptureStream;
-    if (!captureStreamFn) {
-      toast('PiP not supported — use Fullscreen instead');
-      return;
-    }
-
-    drawPip();
-    const stream = captureStreamFn.call(canvas, 30);
-    const video = $('pip-video');
-    video.srcObject = stream;
-
-    // Safari requires the video to be in the DOM and visible briefly
-    video.style.display = 'block';
-    video.style.position = 'fixed';
-    video.style.top = '-9999px';
-
-    await video.play().catch(() => {});
-
-    // Chrome/Edge: standard PiP
-    if (video.requestPictureInPicture) {
-      await video.requestPictureInPicture();
-      video.style.display = 'none';
-      toast('Timer in Picture-in-Picture');
-    }
-    // Safari 14+: webkit PiP
-    else if (video.webkitSupportsPresentationMode &&
-             video.webkitSupportsPresentationMode('picture-in-picture')) {
-      video.webkitSetPresentationMode('picture-in-picture');
-      toast('Timer in Picture-in-Picture');
-    }
-    else {
-      // Fallback: enter fullscreen with the pip video visible
-      if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
-      video.style.display = 'none';
-      toast('PiP not supported — try Fullscreen mode');
-    }
-
-    video.addEventListener('leavepictureinpicture', () => {
-      if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
-      video.style.display = 'none';
-    }, { once: true });
-    video.addEventListener('webkitpresentationmodechanged', () => {
-      if (video.webkitPresentationMode !== 'picture-in-picture') {
-        if (cancelAnimationFrame) cancelAnimationFrame(pipAnimFrame);
-        video.style.display = 'none';
-      }
-    }, { once: true });
+    await enterPip();
+    toast('Timer in Picture-in-Picture');
   } catch (e) {
     console.warn('PiP error:', e);
-    toast('Picture-in-Picture not supported in this browser');
+    toast('Picture-in-Picture not supported — try Fullscreen instead');
   }
 });
+
+// Keep the stream warm so re-opening PiP is instant; no cleanup needed on close
+$('pip-video').addEventListener('leavepictureinpicture', () => {});
+$('pip-video').addEventListener('webkitpresentationmodechanged', () => {});
+
+// Prime the capture pipeline as soon as the page loads (muted autoplay is
+// allowed everywhere, so this needs no user gesture)
+setupPip();
 
 /* ── FULLSCREEN MODE ─────────────────────────── */
 function isFullscreen() {
@@ -627,315 +658,6 @@ function stopContinuousRingtone() {
 }
 
 /* ═══════════════════════════════════════════════
-   AMBIENT AUDIO MIXER
-═══════════════════════════════════════════════ */
-let audioCtx = null;
-const soundState = { rain: false, fire: false, cafe: false, noise: false };
-const gainNodes = {};
-
-// Generate ambient sounds procedurally (no file deps)
-function getAudioContext() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
-}
-
-const activeSources = {};
-
-function createNoiseBuffer(type = 'brown') {
-  const ctx = getAudioContext();
-  const bufferSize = ctx.sampleRate * 3;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-
-  if (type === 'brown') {
-    // Improved brown noise with better spectral characteristics
-    let last = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      data[i] = (last + (0.025 * white)) / 1.025;
-      last = data[i];
-      data[i] *= 3.2;
-    }
-  } else if (type === 'pink') {
-    // Pink noise for more natural sounds
-    let last = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      data[i] = (last + (0.015 * white)) / 1.015;
-      last = data[i];
-      data[i] *= 2.5;
-    }
-  } else if (type === 'white') {
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-  } else if (type === 'rain') {
-    // Rain-specific noise with pink characteristics
-    let last = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      data[i] = (last + (0.018 * white)) / 1.018;
-      last = data[i];
-      data[i] *= 2.9;
-    }
-  }
-
-  return buffer;
-}
-
-function startSound(name) {
-  const ctx = getAudioContext();
-
-  // Stop existing
-  stopSound(name);
-
-  const gain = ctx.createGain();
-  gainNodes[name] = gain;
-  gain.connect(ctx.destination);
-
-  // Get volume
-  const slider = document.querySelector(`.sound-vol[data-sound="${name}"]`);
-  const vol = (parseInt(slider?.value || 60) / 100) * ((appSettings.master_volume || 80) / 100);
-  gain.gain.value = vol;
-
-  if (name === 'rain') {
-    // Realistic rain with multiple filtered layers
-    const playRain = () => {
-      const buffer = createNoiseBuffer('rain');
-
-      // Layer 1: High-frequency rain patter (3000-6000Hz)
-      const source1 = ctx.createBufferSource();
-      source1.buffer = buffer;
-      const filter1 = ctx.createBiquadFilter();
-      filter1.type = 'highpass';
-      filter1.frequency.value = 3000;
-      const filter1b = ctx.createBiquadFilter();
-      filter1b.type = 'lowpass';
-      filter1b.frequency.value = 6000;
-      const gain1 = ctx.createGain();
-      gain1.gain.value = 0.6;
-      source1.connect(filter1);
-      filter1.connect(filter1b);
-      filter1b.connect(gain1);
-      gain1.connect(gain);
-
-      // Layer 2: Mid-frequency rain (1000-3000Hz)
-      const source2 = ctx.createBufferSource();
-      source2.buffer = buffer;
-      const filter2 = ctx.createBiquadFilter();
-      filter2.type = 'bandpass';
-      filter2.frequency.value = 2000;
-      filter2.Q.value = 0.7;
-      const gain2 = ctx.createGain();
-      gain2.gain.value = 0.4;
-      source2.connect(filter2);
-      filter2.connect(gain2);
-      gain2.connect(gain);
-
-      source1.start();
-      source2.start();
-      source1.onended = () => { if (soundState.rain) playRain(); };
-      activeSources[name] = source1;
-    };
-    playRain();
-  } else if (name === 'fire') {
-    // Realistic fireplace with crackling effects
-    const playFire = () => {
-      const buffer = createNoiseBuffer('brown');
-
-      // Main fire rumble
-      const source1 = ctx.createBufferSource();
-      source1.buffer = buffer;
-      const filter1 = ctx.createBiquadFilter();
-      filter1.type = 'lowpass';
-      filter1.frequency.value = 400;
-      filter1.Q.value = 0.8;
-      const gain1 = ctx.createGain();
-      gain1.gain.value = 0.5;
-      source1.connect(filter1);
-      filter1.connect(gain1);
-      gain1.connect(gain);
-
-      // Crackling mid-range
-      const source2 = ctx.createBufferSource();
-      source2.buffer = buffer;
-      const filter2 = ctx.createBiquadFilter();
-      filter2.type = 'bandpass';
-      filter2.frequency.value = 1200;
-      filter2.Q.value = 1.2;
-      const gain2 = ctx.createGain();
-      gain2.gain.value = 0.4;
-      source2.connect(filter2);
-      filter2.connect(gain2);
-      gain2.connect(gain);
-
-      // Add occasional pops/crackles with oscillators
-      for (let i = 0; i < 3; i++) {
-        setTimeout(() => {
-          if (soundState.fire) {
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            const crackGain = ctx.createGain();
-            crackGain.gain.setValueAtTime(0.3, ctx.currentTime);
-            crackGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-            osc.frequency.setValueAtTime(Math.random() * 400 + 100, ctx.currentTime);
-            osc.connect(crackGain);
-            crackGain.connect(gain);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15);
-          }
-        }, i * 800 + Math.random() * 400);
-      }
-
-      source1.start();
-      source2.start();
-      source1.onended = () => { if (soundState.fire) playFire(); };
-      activeSources[name] = source1;
-    };
-    playFire();
-  } else if (name === 'cafe') {
-    // Coffee shop ambience with multiple layers
-    const playCafe = () => {
-      const buffer = createNoiseBuffer('white');
-
-      // Layer 1: Low rumble (voices beneath)
-      const source1 = ctx.createBufferSource();
-      source1.buffer = buffer;
-      const filter1 = ctx.createBiquadFilter();
-      filter1.type = 'lowpass';
-      filter1.frequency.value = 300;
-      const gain1 = ctx.createGain();
-      gain1.gain.value = 0.3;
-      source1.connect(filter1);
-      filter1.connect(gain1);
-      gain1.connect(gain);
-
-      // Layer 2: Voice range chatter (500-2000Hz)
-      const source2 = ctx.createBufferSource();
-      source2.buffer = buffer;
-      const filter2 = ctx.createBiquadFilter();
-      filter2.type = 'bandpass';
-      filter2.frequency.value = 1200;
-      filter2.Q.value = 0.9;
-      const gain2 = ctx.createGain();
-      gain2.gain.value = 0.5;
-      source2.connect(filter2);
-      filter2.connect(gain2);
-      gain2.connect(gain);
-
-      // Layer 3: High ambient (espresso machine, cups clinking)
-      const source3 = ctx.createBufferSource();
-      source3.buffer = buffer;
-      const filter3 = ctx.createBiquadFilter();
-      filter3.type = 'highpass';
-      filter3.frequency.value = 2000;
-      const gain3 = ctx.createGain();
-      gain3.gain.value = 0.2;
-      source3.connect(filter3);
-      filter3.connect(gain3);
-      gain3.connect(gain);
-
-      source1.start();
-      source2.start();
-      source3.start();
-      source1.onended = () => { if (soundState.cafe) playCafe(); };
-      activeSources[name] = source1;
-    };
-    playCafe();
-  } else if (name === 'noise') {
-    // Clean, smooth brown noise
-    const playNoise = () => {
-      const buffer = createNoiseBuffer('brown');
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-
-      // Apply gentle smoothing filter
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 8000;
-      filter.Q.value = 0.5;
-
-      source.connect(filter);
-      filter.connect(gain);
-      source.start();
-      source.onended = () => { if (soundState.noise) playNoise(); };
-      activeSources[name] = source;
-    };
-    playNoise();
-  }
-}
-
-function stopSound(name) {
-  try {
-    if (activeSources[name]) {
-      activeSources[name].stop();
-      delete activeSources[name];
-    }
-  } catch(e) {}
-}
-
-function pauseAllSounds() {
-  Object.keys(soundState).forEach(n => {
-    if (soundState[n]) {
-      stopSound(n);
-      soundState[n] = false;
-      updateSoundBtn(n, false);
-    }
-  });
-}
-
-function updateSoundBtn(name, playing) {
-  const btn = document.querySelector(`.sound-toggle[data-sound="${name}"]`);
-  if (!btn) return;
-  btn.classList.toggle('playing', playing);
-  btn.setAttribute('aria-pressed', playing);
-}
-
-// Toggle sound buttons
-document.querySelectorAll('.sound-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const name = btn.dataset.sound;
-    soundState[name] = !soundState[name];
-    if (soundState[name]) {
-      startSound(name);
-    } else {
-      stopSound(name);
-    }
-    updateSoundBtn(name, soundState[name]);
-  });
-});
-
-// Volume sliders
-document.querySelectorAll('.sound-vol').forEach(slider => {
-  slider.addEventListener('input', () => {
-    const name = slider.dataset.sound;
-    const pct = slider.parentElement.querySelector('.vol-pct');
-    if (pct) pct.textContent = slider.value + '%';
-
-    if (gainNodes[name]) {
-      const vol = (parseInt(slider.value) / 100) * ((appSettings.master_volume || 80) / 100);
-      gainNodes[name].gain.value = vol;
-    }
-  });
-});
-
-// Audio panel toggle
-$('audio-trigger').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const panel = $('audio-panel');
-  const isOpen = panel.classList.toggle('open');
-  $('audio-trigger').setAttribute('aria-expanded', isOpen);
-  panel.setAttribute('aria-hidden', !isOpen);
-  // Close others
-  if (isOpen) {
-    $('tasks-panel').classList.remove('open');
-    $('stats-panel').classList.remove('open');
-    $('theme-dropdown').classList.remove('open');
-  }
-});
-
-/* ═══════════════════════════════════════════════
    TASKS
 ═══════════════════════════════════════════════ */
 let tasks = [];
@@ -1050,7 +772,6 @@ $('task-trigger').addEventListener('click', (e) => {
   $('task-trigger').setAttribute('aria-expanded', isOpen);
   panel.setAttribute('aria-hidden', !isOpen);
   if (isOpen) {
-    $('audio-panel').classList.remove('open');
     $('stats-panel').classList.remove('open');
     $('theme-dropdown').classList.remove('open');
   }
@@ -1071,7 +792,6 @@ $('themes-btn').addEventListener('click', (e) => {
   $('themes-btn').setAttribute('aria-expanded', isOpen);
   if (isOpen) {
     $('tasks-panel').classList.remove('open');
-    $('audio-panel').classList.remove('open');
     $('stats-panel').classList.remove('open');
   }
 });
@@ -1160,7 +880,6 @@ $('stats-btn').addEventListener('click', (e) => {
     fetchStats();
     $('theme-dropdown').classList.remove('open');
     $('tasks-panel').classList.remove('open');
-    $('audio-panel').classList.remove('open');
   }
 });
 
@@ -1204,7 +923,6 @@ document.addEventListener('keydown', e => {
     if ($('settings-overlay').classList.contains('open')) closeSettings();
     // Also close panels
     $('tasks-panel').classList.remove('open');
-    $('audio-panel').classList.remove('open');
     $('stats-panel').classList.remove('open');
     $('theme-dropdown').classList.remove('open');
   }
@@ -1225,18 +943,6 @@ $('s-alert-vol').addEventListener('input', () => {
   $('alert-vol-val').textContent = $('s-alert-vol').value;
 });
 
-$('s-master-vol').addEventListener('input', () => {
-  $('master-vol-val').textContent = $('s-master-vol').value;
-  appSettings.master_volume = parseInt($('s-master-vol').value);
-  // Update all active gains
-  Object.keys(gainNodes).forEach(name => {
-    const slider = document.querySelector(`.sound-vol[data-sound="${name}"]`);
-    if (gainNodes[name] && slider) {
-      gainNodes[name].gain.value = (parseInt(slider.value) / 100) * (appSettings.master_volume / 100);
-    }
-  });
-});
-
 // Clear mode toggle
 $('s-clear-mode').addEventListener('change', () => {
   document.body.classList.toggle('clear-mode', $('s-clear-mode').checked);
@@ -1255,9 +961,6 @@ async function loadSettingsForm() {
     $('s-alert-sound').value = data.alert_sound || 'digital_bell';
     $('s-alert-vol').value = data.alert_volume || 70;
     $('alert-vol-val').textContent = data.alert_volume || 70;
-    $('s-master-vol').value = data.master_volume || 80;
-    $('master-vol-val').textContent = data.master_volume || 80;
-    $('s-auto-pause').checked = data.auto_pause_ambient !== false;
     clockFormat = data.clock_format || '12';
     updateClock();
     $('username-display').textContent = data.username || 'Friend';
@@ -1292,13 +995,6 @@ async function saveSettings(section) {
     };
     timerSettings = { focus: payload.focus_duration, short: payload.short_break, long: payload.long_break };
     if (!timerRunning) setMode(currentMode);
-  } else if (section === 'audio') {
-    payload = {
-      master_volume: parseInt($('s-master-vol').value),
-      auto_pause_ambient: $('s-auto-pause').checked
-    };
-    appSettings.auto_pause_ambient = payload.auto_pause_ambient;
-    appSettings.master_volume = payload.master_volume;
   }
 
   const result = await api('/settings', 'POST', payload);
@@ -1314,7 +1010,6 @@ async function saveSettings(section) {
 
 $('save-general').addEventListener('click', () => saveSettings('general'));
 $('save-timer').addEventListener('click', () => saveSettings('timer'));
-$('save-audio').addEventListener('click', () => saveSettings('audio'));
 
 /* ═══════════════════════════════════════════════
    WALLPAPER SETTINGS
@@ -1397,7 +1092,6 @@ $('remove-wallpaper-btn').addEventListener('click', () => {
 document.addEventListener('click', (e) => {
   const panels = [
     { panel: 'tasks-panel', trigger: 'task-trigger' },
-    { panel: 'audio-panel', trigger: 'audio-trigger' },
     { panel: 'stats-panel', trigger: 'stats-btn' },
     { panel: 'theme-dropdown', trigger: 'themes-btn' }
   ];
